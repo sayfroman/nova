@@ -3,7 +3,7 @@ import json
 import logging
 import gspread
 from google.oauth2.service_account import Credentials
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 import datetime
 import random
@@ -32,7 +32,7 @@ sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1  #
 
 # Получаем токен бота из переменных окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # Приводим к числу
+ADMIN_IDS = [5385649, 7368748440]  # ID администраторов
 
 # Пример текстов для публикации
 START_MESSAGES = [
@@ -60,7 +60,21 @@ def get_trainer_info(user_id):
     return None, None, None
 
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Привет! Отправляйте фотоотчет, и я опубликую его в нужном канале.")
+    user_id = update.message.from_user.id
+    
+    # Проверка на авторизацию
+    if user_id not in [trainer["Trainer_ID"] for trainer in sheet.get_all_records()]:
+        await update.message.reply_text(
+            "Простите, но у вас нет доступа к использованию этого бота. Он создан только для тренерского штаба NOVA Football Uzbekistan. Обратитесь к руководству за получением доступа."
+        )
+        return
+
+    # Вывод кнопок для тренера
+    keyboard = [
+        [InlineKeyboardButton("Отправить фото", callback_data="send_photo")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Привет! Выберите команду:", reply_markup=reply_markup)
 
 async def handle_photo(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
@@ -99,7 +113,8 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Фото не найдено!")
 
 async def penalties(update: Update, context: CallbackContext) -> None:
-    if update.message.from_user.id != ADMIN_ID:
+    if update.message.from_user.id not in ADMIN_IDS:
+        await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
     report = "Статистика штрафов:\n"
@@ -109,7 +124,8 @@ async def penalties(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(report)
 
 async def reset_penalties(update: Update, context: CallbackContext) -> None:
-    if update.message.from_user.id != ADMIN_ID:
+    if update.message.from_user.id not in ADMIN_IDS:
+        await update.message.reply_text("У вас нет доступа к этой команде.")
         return
     
     PENALTIES.clear()
