@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timedelta
 import pytz
 from telegram import Bot
+from telegram.ext import Updater, CallbackContext
 
 # Указываем часовой пояс Ташкента
 tashkent_tz = pytz.timezone('Asia/Tashkent')
@@ -18,6 +19,11 @@ creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", sco
 client = gspread.authorize(creds)
 sheet = client.open("Football_School").sheet1
 
+# Токен бота
+BOT_TOKEN = "7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ"
+bot = Bot(token=BOT_TOKEN)
+
+# Получение расписания тренеров
 def get_trainer_schedule():
     data = sheet.get_all_records()
     schedule = {}
@@ -33,6 +39,26 @@ def get_trainer_schedule():
         }
     return schedule
 
+# Функция напоминаний
+def send_reminders(context: CallbackContext):
+    schedule = get_trainer_schedule()
+    now = datetime.now(tashkent_tz)
+    today = now.strftime("%A")
+    
+    for trainer_id, trainer_info in schedule.items():
+        if today in trainer_info["days_of_week"]:
+            start_time = datetime.strptime(trainer_info["start_time"], "%H:%M").time()
+            start_datetime = datetime.combine(now.date(), start_time).astimezone(tashkent_tz)
+            
+            # Напоминание за 1 час до тренировки
+            if now + timedelta(hours=1) >= start_datetime > now:
+                bot.send_message(chat_id=trainer_id, text="Через час у вас тренировка. Не забудьте отправить фотоотчеты вовремя.")
+            
+            # Напоминание в момент начала тренировки
+            if now >= start_datetime and now < start_datetime + timedelta(minutes=1):
+                bot.send_message(chat_id=trainer_id, text="Тренировка началась. Не забудьте отправить фото 📸")
+
+# Функция проверки времени отправки фото
 def should_accept_photo(trainer_id):
     schedule = get_trainer_schedule()
     now = datetime.now(tashkent_tz)
@@ -59,6 +85,7 @@ def should_accept_photo(trainer_id):
     
     return True, ""
 
+# Обработка фото
 def process_photo(trainer_id, photo):
     accepted, message = should_accept_photo(trainer_id)
     if not accepted:
@@ -72,13 +99,13 @@ def process_photo(trainer_id, photo):
         logger.warning(f"Нет указанного Channel_ID для филиала {trainer_info['branch']}")
         return f"Внимание! У филиала {trainer_info['branch']} не указан канал для публикации. Добавьте Channel_ID в таблицу."
     
-    bot = Bot(token="YOUR_BOT_TOKEN")
     bot.send_photo(chat_id=channel_id, photo=photo, caption=f"Фотоотчет от {trainer_info['name']} ({trainer_info['branch']})")
     
     return "Фото успешно опубликовано."
 
-# Функция для периодического обновления данных каждые 10 минут
-import time
-while True:
-    get_trainer_schedule()
-    time.sleep(600)
+# Запуск периодического обновления расписания и напоминаний
+updater = Updater(token=BOT_TOKEN, use_context=True)
+job_queue = updater.job_queue
+job_queue.run_repeating(send_reminders, interval=600, first=10)  # Каждые 10 минут
+updater.start_polling()
+updater.idle()
