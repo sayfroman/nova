@@ -1,21 +1,22 @@
-import gspread
-from google.oauth2.service_account import Credentials
-
-# 1. Укажите путь к скачанному JSON-файлу
-SERVICE_ACCOUNT_FILE = "solus-382301-5cbc0fd8d8cf.json"  # <-- Здесь впишите точное название вашего файла
-
-# 2. Настроим доступ к Google Sheets API
-scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-import json
 import os
+import json
+import logging
 
-service_account_info = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
-creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
-client = gspread.authorize(creds)
+# Настраиваем логирование для отладки
+logging.basicConfig(level=logging.INFO)
 
-# 3. Подключаем Google Таблицу по её ID
-SPREADSHEET_ID = "19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g"  # <-- Вставьте ID вашей таблицы сюда
-sheet = client.open_by_key(SPREADSHEET_ID).sheet1  # Открываем первый лист
+# Получаем учетные данные Google из переменной окружения
+credentials_json = os.getenv("GOOGLE_CREDENTIALS")
+
+if not credentials_json:
+    logging.error("Переменная окружения GOOGLE_CREDENTIALS не установлена или пуста!")
+    raise ValueError("GOOGLE_CREDENTIALS environment variable is missing or empty")
+
+try:
+    service_account_info = json.loads(credentials_json)
+except json.JSONDecodeError as e:
+    logging.error(f"Ошибка при разборе JSON GOOGLE_CREDENTIALS: {e}")
+    raise ValueError("Invalid JSON format in GOOGLE_CREDENTIALS")
 
 import logging
 import random
