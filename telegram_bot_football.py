@@ -67,7 +67,7 @@ async def start(update: Update, context: CallbackContext) -> None:
     # Проверка на авторизацию
     if user_id not in [trainer["Trainer_ID"] for trainer in sheet.get_all_records()]:
         await update.message.reply_text(
-            "Простите, но у вас нет доступа к использованию этого бота. Он создан только для тренерского штаба NOVA Football Uzbekistan. Обратитесь к руководству за получением доступа."
+            "У вас нет доступа к использованию этого бота. Он создан только для тренерского штаба NOVA Football Uzbekistan. Обратитесь к руководству."
         )
         return
 
@@ -93,7 +93,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     # Проверяем, что тренировка идет в правильный день недели
     days_of_week_list = [day.strip() for day in days_of_week.split(",")]  # Преобразуем строку в список дней
     if current_day not in days_of_week_list:
-        await update.message.reply_text(f"Сегодня не тренировка. Тренировка у вас в следующие дни: {', '.join(days_of_week_list)}.")
+        await update.message.reply_text(f"У вас сегодня нет тренировок. Ваше расписание: {', '.join(days_of_week_list)}.")
         return
     
     # Проверяем время отправки фото
