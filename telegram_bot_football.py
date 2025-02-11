@@ -1,3 +1,18 @@
+import gspread
+from google.oauth2.service_account import Credentials
+
+# 1. Укажите путь к скачанному JSON-файлу
+SERVICE_ACCOUNT_FILE = "solus-382301-5cbc0fd8d8cf.json"  # <-- Здесь впишите точное название вашего файла
+
+# 2. Настроим доступ к Google Sheets API
+scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+client = gspread.authorize(creds)
+
+# 3. Подключаем Google Таблицу по её ID
+SPREADSHEET_ID = "19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g"  # <-- Вставьте ID вашей таблицы сюда
+sheet = client.open_by_key(SPREADSHEET_ID).sheet1  # Открываем первый лист
+
 import logging
 import random
 import os
