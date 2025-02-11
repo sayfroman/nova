@@ -97,7 +97,7 @@ def main() -> None:
     logger = logging.getLogger(__name__)
 
     # Создаем объект Application и передаем токен бота
-    application = Application.builder().token("YOUR_BOT_API_KEY").build()
+    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
 
     # Регистрация обработчиков команд и сообщений
     application.add_handler(CommandHandler("start", start))
