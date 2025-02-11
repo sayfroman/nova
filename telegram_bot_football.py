@@ -1,112 +1,65 @@
-import pytz
-from datetime import datetime, timedelta
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 import logging
 import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler
+from telegram.ext import MessageHandler, filters
+from telegram.ext import CallbackContext
 
-# Устанавливаем временную зону для Ташкента
-tashkent_tz = pytz.timezone('Asia/Tashkent')
+# Устанавливаем уровень логирования
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Получаем текущее время в Ташкенте
-def get_current_time():
-    now = datetime.now(tashkent_tz)
-    return now
+# Ваш токен
+TOKEN = "7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ"
 
-# Функция для проверки времени отправки фото
-def check_photo_submission_time(training_start_time):
-    current_time = get_current_time()  # Получаем текущее время в Ташкенте
-    time_difference = current_time - training_start_time
+# Стартовая команда
+async def start(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("Отправить фотоотчет", callback_data='photo_report')],
+        [InlineKeyboardButton("Посмотреть статистику штрафов", callback_data='view_fines')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text('Добро пожаловать! Выберите действие:', reply_markup=reply_markup)
 
-    # Проверка на 12 минут после начала тренировки
-    if time_difference > timedelta(minutes=12):
-        return False  # Фото отправлено слишком поздно
-    return True  # Фото отправлено вовремя
+# Обработка нажатий на кнопки
+async def button(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
 
-# Стартовый метод бота
-async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text("Здравствуйте! Я ваш бот для отправки фото отчетов.")
+    if query.data == 'photo_report':
+        await query.edit_message_text(text="Пожалуйста, отправьте фотоотчет.")
+        # Дополнительный код для обработки фотоотчетов
 
-# Обработчик фото
-async def handle_photo(update: Update, context: CallbackContext) -> None:
-    # Получаем фото
-    photo_file = update.message.photo[-1].get_file()
-    photo_file.download('photo.jpg')
+    elif query.data == 'view_fines':
+        await query.edit_message_text(text="Показать статистику штрафов.")
+        # Дополнительный код для статистики штрафов
 
-    # Время начала тренировки (пример)
-    training_start_time = datetime(2025, 2, 11, 9, 0, 0, tzinfo=tashkent_tz)
-
-    # Проверяем, отправлено ли фото вовремя
-    if check_photo_submission_time(training_start_time):
-        await update.message.reply_text("Фотография опубликована. Не забудьте также отправить фотографию об окончании тренировки.")
-    else:
-        await update.message.reply_text("Фотография отправлена слишком поздно и не принята. Вам начислен 1 штраф в виде 30% от оплаты за тренировку. Старайтесь отправлять фото вовремя.")
-
-# Напоминания тренерам
-async def send_reminders(context: CallbackContext) -> None:
-    job = context.job
-    bot = context.bot
-
-    # Часы напоминаний
-    reminder_time = get_current_time() + timedelta(hours=1)
-    await bot.send_message(job.context['chat_id'], f"Через час у вас тренировка. Не забудьте отправить фотоотчеты вовремя.")
-
-    # Напоминание в начале тренировки
-    await bot.send_message(job.context['chat_id'], f"Тренировка началась. Не забудьте отправить фото 📸")
-
-    # Напоминание об отправке фотографии после тренировки
-    await bot.send_message(job.context['chat_id'], f"Фотография опубликована. Не забудьте также отправить фотографию об окончании тренировки")
-
-# Старт планировщика для напоминаний
-async def set_up_reminders(update: Update, context: CallbackContext) -> None:
-    chat_id = update.message.chat_id
-    context.job_queue.run_once(send_reminders, 3600, context={'chat_id': chat_id})
-    await update.message.reply_text("Напоминания установлены.")
-
-# Функция для получения статистики штрафов
-def get_fine_statistics() -> str:
-    # Пример статистики
-    fines_data = {
-        "Иванов Иван": [
-            {"date": "2 февраля", "time": "10:15", "fine": 1},
-            {"date": "8 февраля", "time": "09:55", "fine": 1}
-        ],
-        "Петров Петр": [
-            {"date": "5 февраля", "time": "11:20", "fine": 1}
-        ]
-    }
-
-    statistics = "Статистика штрафов за февраль 2025:\n"
-    for trainer, fines in fines_data.items():
-        statistics += f"\n{trainer}\n"
-        statistics += f"Количество штрафов: {len(fines)}\n"
-        for fine in fines:
-            statistics += f"{fine['date']}, {fine['time']} — {fine['fine']} штраф\n"
-    return statistics
-
-# Команда для получения статистики штрафов
-async def fines(update: Update, context: CallbackContext) -> None:
-    fines_data = get_fine_statistics()
-    await update.message.reply_text(fines_data)
+# Обработка текста сообщений
+async def handle_message(update: Update, context: CallbackContext):
+    if update.message.text:
+        text = update.message.text.lower()
+        if 'фотоотчет' in text:
+            # Дополнительная логика обработки фотоотчета
+            await update.message.reply_text("Отправьте фото отчета.")
+        elif 'штрафы' in text:
+            # Логика для вывода статистики штрафов
+            await update.message.reply_text("Показать статистику штрафов.")
+        else:
+            await update.message.reply_text("Не распознал команду. Пожалуйста, используйте кнопки.")
 
 # Основная функция для запуска бота
-def main() -> None:
-    # Настройка логирования
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                        level=logging.INFO)
-    logger = logging.getLogger(__name__)
+async def main():
+    # Создаем приложение
+    application = Application.builder().token(TOKEN).build()
 
-    # Создаем объект Application и передаем токен бота
-    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
-
-    # Регистрация обработчиков команд и сообщений
+    # Команды и обработчики
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("fines", fines))
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    application.add_handler(CommandHandler("set_reminders", set_up_reminders))
+    application.add_handler(CallbackQueryHandler(button))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    # Запуск polling
-    application.run_polling()
+    # Запуск бота
+    await application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
