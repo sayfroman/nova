@@ -1,10 +1,8 @@
 import os
 import json
 import logging
-import random
-import datetime
-gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import gspread
+from google.oauth2.service_account import Credentials
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
