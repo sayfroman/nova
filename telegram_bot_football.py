@@ -49,16 +49,18 @@ END_MESSAGES = [
 # Хранение штрафов
 PENALTIES = {}
 
+# Функция для получения информации о тренере
 def get_trainer_info(user_id):
     try:
         data = sheet.get_all_records()
         for row in data:
             if str(row["Trainer_ID"]) == str(user_id):
-                return row["Branch"], row["Start_Time"], row["End_Time"]
+                return row["Branch"], row["Start_Time"], row["End_Time"], row["Channel_ID"], row["Days_of_Week"]
     except Exception as e:
         logging.error(f"Ошибка при получении данных из Google Sheets: {e}")
-    return None, None, None
+    return None, None, None, None, None
 
+# Функция старта
 async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     
@@ -76,14 +78,22 @@ async def start(update: Update, context: CallbackContext) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("Привет! Выберите команду:", reply_markup=reply_markup)
 
+# Функция для обработки фото
 async def handle_photo(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     now = datetime.datetime.now().strftime("%H:%M")
+    current_day = datetime.datetime.now().strftime("%A")  # Получаем день недели в формате "Monday"
     
-    # Определяем филиал и расписание тренера
-    branch, start_time, end_time = get_trainer_info(user_id)
+    # Определяем день недели и расписание тренера
+    branch, start_time, end_time, channel_id, days_of_week = get_trainer_info(user_id)
     if not branch:
         await update.message.reply_text("Вы не зарегистрированы как тренер!")
+        return
+    
+    # Проверяем, что тренировка идет в правильный день недели
+    days_of_week_list = [day.strip() for day in days_of_week.split(",")]  # Преобразуем строку в список дней
+    if current_day not in days_of_week_list:
+        await update.message.reply_text(f"Сегодня не тренировка. Тренировка у вас в следующие дни: {', '.join(days_of_week_list)}.")
         return
     
     # Проверяем время отправки фото
@@ -101,10 +111,9 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     message_text = random.choice(START_MESSAGES if time_now <= end_dt else END_MESSAGES)
     
     # Отправляем фото в канал
-    CHANNEL_ID = "@your_channel_here"
     if update.message.photo:
         try:
-            await context.bot.send_photo(chat_id=CHANNEL_ID, photo=update.message.photo[-1].file_id, caption=message_text)
+            await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text)
             await update.message.reply_text("Фото успешно опубликовано!")
         except Exception as e:
             logging.error(f"Ошибка при отправке фото: {e}")
@@ -112,6 +121,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     else:
         await update.message.reply_text("Фото не найдено!")
 
+# Функция для проверки штрафов
 async def penalties(update: Update, context: CallbackContext) -> None:
     if update.message.from_user.id not in ADMIN_IDS:
         await update.message.reply_text("У вас нет доступа к этой команде.")
@@ -123,6 +133,7 @@ async def penalties(update: Update, context: CallbackContext) -> None:
     
     await update.message.reply_text(report)
 
+# Функция для сброса штрафов
 async def reset_penalties(update: Update, context: CallbackContext) -> None:
     if update.message.from_user.id not in ADMIN_IDS:
         await update.message.reply_text("У вас нет доступа к этой команде.")
