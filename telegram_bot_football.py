@@ -90,7 +90,7 @@ async def fines(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(fines_data)
 
 # Основная функция для запуска бота
-async def main() -> None:
+def main() -> None:
     # Настройка логирования
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                         level=logging.INFO)
@@ -106,7 +106,7 @@ async def main() -> None:
     application.add_handler(CommandHandler("set_reminders", set_up_reminders))
 
     # Запуск polling
-    await application.run_polling()
+    application.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
