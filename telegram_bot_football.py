@@ -28,7 +28,7 @@ except json.JSONDecodeError as e:
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 credentials = Credentials.from_service_account_info(service_account_info, scopes=scope)
 gc = gspread.authorize(credentials)
-sheet = gc.open("Football_Schedule").sheet1  # Укажите точное название таблицы
+sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1  # Укажите точное название таблицы
 
 # Получаем токен бота из переменных окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
