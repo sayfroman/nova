@@ -1,66 +1,84 @@
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 import logging
-import asyncio
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler
-from telegram.ext import MessageHandler, filters
-from telegram.ext import CallbackContext
+from datetime import datetime, timedelta
+import pytz
+from telegram import Bot
 
-# Устанавливаем уровень логирования
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                    level=logging.INFO)
+# Указываем часовой пояс Ташкента
+tashkent_tz = pytz.timezone('Asia/Tashkent')
+
+# Настройки логирования
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Ваш токен
-TOKEN = "7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ"
+# Авторизация в Google Sheets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
+sheet = client.open("Football_School").sheet1
 
-# Стартовая команда
-async def start(update: Update, context: CallbackContext):
-    keyboard = [
-        [InlineKeyboardButton("Отправить фотоотчет", callback_data='photo_report')],
-        [InlineKeyboardButton("Посмотреть статистику штрафов", callback_data='view_fines')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Добро пожаловать! Выберите действие:', reply_markup=reply_markup)
+def get_trainer_schedule():
+    data = sheet.get_all_records()
+    schedule = {}
+    for row in data:
+        trainer_id = row["Trainer_ID"]
+        schedule[trainer_id] = {
+            "name": row["Trainer_Name"],
+            "branch": row["Branch"],
+            "start_time": row["Start_Time"],
+            "end_time": row["End_Time"],
+            "channel_id": row["Channel_ID"],
+            "days_of_week": row["Days_of_Week"].split(", ")
+        }
+    return schedule
 
-# Обработка нажатий на кнопки
-async def button(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
+def should_accept_photo(trainer_id):
+    schedule = get_trainer_schedule()
+    now = datetime.now(tashkent_tz)
+    today = now.strftime("%A")
+    
+    if trainer_id not in schedule:
+        return False, "Вы не зарегистрированы в системе."
+    
+    trainer_info = schedule[trainer_id]
+    if today not in trainer_info["days_of_week"]:
+        return False, "Сегодня у вас нет тренировки. Если возникла ошибка, свяжитесь с менеджером."
+    
+    start_time = datetime.strptime(trainer_info["start_time"], "%H:%M").time()
+    end_time = datetime.strptime(trainer_info["end_time"], "%H:%M").time()
+    
+    start_datetime = datetime.combine(now.date(), start_time).astimezone(tashkent_tz)
+    end_datetime = datetime.combine(now.date(), end_time).astimezone(tashkent_tz)
+    
+    if now < start_datetime - timedelta(minutes=12):
+        return False, "Тренировка еще не началась. Отправьте фото ближе ко времени начала."
+    
+    if now > end_datetime + timedelta(minutes=15):
+        return False, "Вы опоздали с фотоотчетом. Учтите, что за опоздание вам будет назначен штраф в размере 30% от гонорара за эту тренировку."
+    
+    return True, ""
 
-    if query.data == 'photo_report':
-        await query.edit_message_text(text="Пожалуйста, отправьте фотоотчет.")
-        # Дополнительный код для обработки фотоотчетов
+def process_photo(trainer_id, photo):
+    accepted, message = should_accept_photo(trainer_id)
+    if not accepted:
+        return message
+    
+    schedule = get_trainer_schedule()
+    trainer_info = schedule[trainer_id]
+    channel_id = trainer_info["channel_id"]
+    
+    if not channel_id:
+        logger.warning(f"Нет указанного Channel_ID для филиала {trainer_info['branch']}")
+        return f"Внимание! У филиала {trainer_info['branch']} не указан канал для публикации. Добавьте Channel_ID в таблицу."
+    
+    bot = Bot(token="YOUR_BOT_TOKEN")
+    bot.send_photo(chat_id=channel_id, photo=photo, caption=f"Фотоотчет от {trainer_info['name']} ({trainer_info['branch']})")
+    
+    return "Фото успешно опубликовано."
 
-    elif query.data == 'view_fines':
-        await query.edit_message_text(text="Показать статистику штрафов.")
-        # Дополнительный код для статистики штрафов
-
-# Обработка текста сообщений
-async def handle_message(update: Update, context: CallbackContext):
-    if update.message.text:
-        text = update.message.text.lower()
-        if 'фотоотчет' in text:
-            # Дополнительная логика обработки фотоотчета
-            await update.message.reply_text("Отправьте фото отчета.")
-        elif 'штрафы' in text:
-            # Логика для вывода статистики штрафов
-            await update.message.reply_text("Показать статистику штрафов.")
-        else:
-            await update.message.reply_text("Не распознал команду. Пожалуйста, используйте кнопки.")
-
-# Основная функция для запуска бота
-async def main():
-    # Создаем приложение
-    application = Application.builder().token(TOKEN).build()
-
-    # Команды и обработчики
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-    # Запуск бота
-    await application.run_polling()
-
-if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+# Функция для периодического обновления данных каждые 10 минут
+import time
+while True:
+    get_trainer_schedule()
+    time.sleep(600)
