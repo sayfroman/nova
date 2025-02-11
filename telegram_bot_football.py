@@ -1,180 +1,122 @@
-import os
-import json
-import logging
-import gspread
-from google.oauth2.service_account import Credentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-import datetime
-import random
+import pytz
+from datetime import datetime, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+import logging
+from telegram import Update, Bot
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
+from apscheduler.job import Job
 
-# Настраиваем логирование
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Устанавливаем временную зону для Ташкента
+tashkent_tz = pytz.timezone('Asia/Tashkent')
 
-# Получаем учетные данные Google из переменной окружения
-credentials_json = os.getenv("GOOGLE_CREDENTIALS")
-if not credentials_json:
-    logging.error("Переменная окружения GOOGLE_CREDENTIALS не установлена или пуста!")
-    raise ValueError("GOOGLE_CREDENTIALS environment variable is missing or empty")
+# Получаем текущее время в Ташкенте
+def get_current_time():
+    now = datetime.now(tashkent_tz)
+    return now
 
-try:
-    service_account_info = json.loads(credentials_json)
-except json.JSONDecodeError as e:
-    logging.error(f"Ошибка при разборе JSON GOOGLE_CREDENTIALS: {e}")
-    raise ValueError("Invalid JSON format in GOOGLE_CREDENTIALS")
+# Функция для проверки времени отправки фото
+def check_photo_submission_time(training_start_time):
+    current_time = get_current_time()  # Получаем текущее время в Ташкенте
+    time_difference = current_time - training_start_time
 
-# Подключаемся к Google Sheets
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-credentials = Credentials.from_service_account_info(service_account_info, scopes=scope)
-gc = gspread.authorize(credentials)
-sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1  # Укажите точное название таблицы
+    # Проверка на 12 минут после начала тренировки
+    if time_difference > timedelta(minutes=12):
+        return False  # Фото отправлено слишком поздно
+    return True  # Фото отправлено вовремя
 
-# Получаем токен бота из переменных окружения
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = [5385649, 7368748440]  # ID администраторов
+# Стартовый метод бота
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text("Здравствуйте! Я ваш бот для отправки фото отчетов.")
 
-# Пример текстов для публикации
-START_MESSAGES = [
-    "Уважаемые родители, тренировка началась!",
-    "Добрый день! Тренировка стартовала!",
-    "Дети приступили к занятиям."
-]
-END_MESSAGES = [
-    "Тренировка завершена, дети могут идти домой.",
-    "Занятие окончено, ждем всех в следующий раз!",
-    "Тренировка завершена. Хорошего вечера!"
-]
+# Обработчик фото
+def handle_photo(update: Update, context: CallbackContext) -> None:
+    # Получаем фото
+    photo_file = update.message.photo[-1].get_file()
+    photo_file.download('photo.jpg')
 
-# Хранение штрафов
-PENALTIES = {}
+    # Время начала тренировки (пример)
+    training_start_time = datetime(2025, 2, 11, 9, 0, 0, tzinfo=tashkent_tz)
 
-# Функция для получения информации о тренере
-def get_trainer_info(user_id):
-    try:
-        data = sheet.get_all_records()
-        for row in data:
-            if str(row["Trainer_ID"]) == str(user_id):
-                return row["Branch"], row["Start_Time"], row["End_Time"], row["Channel_ID"], row["Days_of_Week"]
-    except Exception as e:
-        logging.error(f"Ошибка при получении данных из Google Sheets: {e}")
-    return None, None, None, None, None
-
-# Функция старта
-async def start(update: Update, context: CallbackContext) -> None:
-    user_id = update.message.from_user.id
-    
-    # Проверка на авторизацию
-    if user_id not in [trainer["Trainer_ID"] for trainer in sheet.get_all_records()]:
-        await update.message.reply_text(
-            "У вас нет доступа к использованию этого бота. Он создан только для тренерского штаба NOVA Football Uzbekistan. Обратитесь к руководству."
-        )
-        return
-
-    # Вывод кнопок для тренера
-    keyboard = [
-        [InlineKeyboardButton("Отправить фото", callback_data="send_photo")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Привет! Выберите команду:", reply_markup=reply_markup)
-
-# Функция для обработки фото
-async def handle_photo(update: Update, context: CallbackContext) -> None:
-    user_id = update.message.from_user.id
-    now = datetime.datetime.now().strftime("%H:%M")
-    current_day = datetime.datetime.now().strftime("%A")  # Получаем день недели в формате "Monday"
-    
-    # Определяем день недели и расписание тренера
-    branch, start_time, end_time, channel_id, days_of_week = get_trainer_info(user_id)
-    if not branch:
-        await update.message.reply_text("Вы не зарегистрированы как тренер!")
-        return
-    
-    # Проверяем, что тренировка идет в правильный день недели
-    days_of_week_list = [day.strip() for day in days_of_week.split(",")]  # Преобразуем строку в список дней
-    if current_day not in days_of_week_list:
-        await update.message.reply_text(f"У вас сегодня нет тренировок. Ваше расписание: {', '.join(days_of_week_list)}.")
-        return
-    
-    # Проверяем время отправки фото
-    time_now = datetime.datetime.strptime(now, "%H:%M").time()
-    start_dt = datetime.datetime.strptime(start_time, "%H:%M").time()
-    end_dt = datetime.datetime.strptime(end_time, "%H:%M").time()
-    
-    if abs((datetime.datetime.combine(datetime.date.today(), time_now) - 
-            datetime.datetime.combine(datetime.date.today(), start_dt)).total_seconds()) > 720:
-        # Штраф за опоздание
-        PENALTIES[user_id] = PENALTIES.get(user_id, 0) + 1
-        await update.message.reply_text("Фотография отправлена слишком поздно и не принята. Вам начислен 1 штраф в виде 30% от оплаты за тренировку. Старайтесь отправлять фото вовремя.")
-        keyboard = [
-            [InlineKeyboardButton("Посмотреть штрафы", callback_data="view_penalties")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text("Посмотрите ваши штрафы:", reply_markup=reply_markup)
-        return
-    
-    # Выбираем случайное сообщение
-    message_text = random.choice(START_MESSAGES if time_now <= end_dt else END_MESSAGES)
-    
-    # Отправляем фото в канал
-    if update.message.photo:
-        try:
-            await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text)
-            await update.message.reply_text("Фото успешно опубликовано!")
-        except Exception as e:
-            logging.error(f"Ошибка при отправке фото: {e}")
-            await update.message.reply_text("Ошибка при публикации фото. Попробуйте позже.")
+    # Проверяем, отправлено ли фото вовремя
+    if check_photo_submission_time(training_start_time):
+        update.message.reply_text("Фотография опубликована. Не забудьте также отправить фотографию об окончании тренировки.")
     else:
-        await update.message.reply_text("Фото не найдено!")
+        update.message.reply_text("Фотография отправлена слишком поздно и не принята. Вам начислен 1 штраф в виде 30% от оплаты за тренировку. Старайтесь отправлять фото вовремя.")
 
-# Функция для проверки штрафов
-async def penalties(update: Update, context: CallbackContext) -> None:
-    if update.message.from_user.id not in ADMIN_IDS:
-        await update.message.reply_text("У вас нет доступа к этой команде.")
-        return
-    
-    report = "Статистика штрафов:\n"
-    for trainer, count in PENALTIES.items():
-        report += f"Тренер {trainer}: {count} штрафов\n"
-    
-    await update.message.reply_text(report)
+# Напоминания тренерам
+def send_reminders(context: CallbackContext):
+    job = context.job
+    bot = context.bot
 
-# Функция для сброса штрафов
-async def reset_penalties(update: Update, context: CallbackContext) -> None:
-    if update.message.from_user.id not in ADMIN_IDS:
-        await update.message.reply_text("У вас нет доступа к этой команде.")
-        return
-    
-    PENALTIES.clear()
-    await update.message.reply_text("Штрафы обнулены.")
+    # Часы напоминаний
+    reminder_time = get_current_time() + timedelta(hours=1)
+    bot.send_message(job.context['chat_id'], f"Через час у вас тренировка. Не забудьте отправить фотоотчеты вовремя.")
 
-# Функция для ежемесячного отчета
-async def send_penalty_report():
-    report = "Статистика штрафов за месяц:\n"
-    for trainer, count in PENALTIES.items():
-        report += f"Тренер {trainer}: {count} штрафов\n"
-    
-    for admin_id in ADMIN_IDS:
-        await context.bot.send_message(chat_id=admin_id, text=report)
-    
-    PENALTIES.clear()
+    # Напоминание в начале тренировки
+    bot.send_message(job.context['chat_id'], f"Тренировка началась. Не забудьте отправить фото 📸")
 
-# Планируем отправку отчета 1-го числа каждого месяца
-scheduler = AsyncIOScheduler()
-scheduler.add_job(send_penalty_report, CronTrigger(day=1, hour=0, minute=0))
+    # Напоминание об отправке фотографии после тренировки
+    bot.send_message(job.context['chat_id'], f"Фотография опубликована. Не забудьте также отправить фотографию об окончании тренировки")
 
-# Запускаем бота
-def main():
-    app = Application.builder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(CommandHandler("penalties", penalties))
-    app.add_handler(CommandHandler("reset_penalties", reset_penalties))
-    
-    logger.info("Бот запущен...")
-    app.run_polling()
+# Старт планировщика для напоминаний
+def set_up_reminders(update: Update, context: CallbackContext):
+    chat_id = update.message.chat_id
+    context.job_queue.run_once(send_reminders, 3600, context={'chat_id': chat_id})
+    update.message.reply_text("Напоминания установлены.")
 
-if __name__ == "__main__":
+# Функция для получения статистики штрафов
+def get_fine_statistics():
+    # Пример статистики
+    fines_data = {
+        "Иванов Иван": [
+            {"date": "2 февраля", "time": "10:15", "fine": 1},
+            {"date": "8 февраля", "time": "09:55", "fine": 1}
+        ],
+        "Петров Петр": [
+            {"date": "5 февраля", "time": "11:20", "fine": 1}
+        ]
+    }
+
+    statistics = "Статистика штрафов за февраль 2025:\n"
+    for trainer, fines in fines_data.items():
+        statistics += f"\n{trainer}\n"
+        statistics += f"Количество штрафов: {len(fines)}\n"
+        for fine in fines:
+            statistics += f"{fine['date']}, {fine['time']} — {fine['fine']} штраф\n"
+    return statistics
+
+# Команда для получения статистики штрафов
+def fines(update: Update, context: CallbackContext):
+    fines_data = get_fine_statistics()
+    update.message.reply_text(fines_data)
+
+# Обработчик команд
+def main() -> None:
+    # Настройка логирования
+    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                        level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    # Создаем объект бота
+    bot = Bot("YOUR_BOT_API_KEY")
+    updater = Updater(bot=bot, use_context=True)
+    dispatcher = updater.dispatcher
+
+    # Регистрация обработчиков команд
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("fines", fines))
+    dispatcher.add_handler(MessageHandler(Filters.photo, handle_photo))
+    dispatcher.add_handler(CommandHandler("set_reminders", set_up_reminders))
+
+    # Запуск бота
+    updater.start_polling()
+
+    # Работаем с напоминаниями
+    updater.job_queue.run_daily(send_reminders, time="09:00")
+
+    # Ожидание работы бота
+    updater.idle()
+
+if __name__ == '__main__':
     main()
