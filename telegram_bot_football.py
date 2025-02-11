@@ -1,13 +1,19 @@
 import os
 import json
 import logging
+import random
+import datetime
+gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from telegram import Update
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
-# Настраиваем логирование для отладки
+# Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Получаем учетные данные Google из переменной окружения
 credentials_json = os.getenv("GOOGLE_CREDENTIALS")
-
 if not credentials_json:
     logging.error("Переменная окружения GOOGLE_CREDENTIALS не установлена или пуста!")
     raise ValueError("GOOGLE_CREDENTIALS environment variable is missing or empty")
@@ -18,29 +24,15 @@ except json.JSONDecodeError as e:
     logging.error(f"Ошибка при разборе JSON GOOGLE_CREDENTIALS: {e}")
     raise ValueError("Invalid JSON format in GOOGLE_CREDENTIALS")
 
-import logging
-import random
-import os
-import datetime
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-
-# Настроим логирование
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+# Подключаемся к Google Sheets
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
+gc = gspread.authorize(credentials)
+sheet = gc.open("Football_Schedule").sheet1  # Укажите точное название таблицы
 
 # Получаем токен бота из переменных окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID = os.getenv("ADMIN_ID")  # ID администратора
-
-# Пример данных тренеров и филиалов
-TRAINERS = {
-    "trainer_1": {"branch": "Branch_A", "start_time": "10:00", "end_time": "11:00"},
-    "trainer_2": {"branch": "Branch_B", "start_time": "14:00", "end_time": "15:00"}
-}
+ADMIN_ID = int(os.getenv("ADMIN_ID", "0"))  # Приводим к числу
 
 # Пример текстов для публикации
 START_MESSAGES = [
@@ -57,6 +49,16 @@ END_MESSAGES = [
 # Хранение штрафов
 PENALTIES = {}
 
+def get_trainer_info(user_id):
+    try:
+        data = sheet.get_all_records()
+        for row in data:
+            if str(row["Trainer_ID"]) == str(user_id):
+                return row["Branch"], row["Start_Time"], row["End_Time"]
+    except Exception as e:
+        logging.error(f"Ошибка при получении данных из Google Sheets: {e}")
+    return None, None, None
+
 async def start(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text("Привет! Отправляйте фотоотчет, и я опубликую его в нужном канале.")
 
@@ -64,37 +66,37 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     now = datetime.datetime.now().strftime("%H:%M")
     
-    # Определяем тренера и филиал
-    trainer = None
-    for t_id, data in TRAINERS.items():
-        if str(user_id) == t_id:
-            trainer = data
-            break
-    
-    if not trainer:
+    # Определяем филиал и расписание тренера
+    branch, start_time, end_time = get_trainer_info(user_id)
+    if not branch:
         await update.message.reply_text("Вы не зарегистрированы как тренер!")
         return
     
-    branch = trainer["branch"]
-    start_time = trainer["start_time"]
-    end_time = trainer["end_time"]
-    
     # Проверяем время отправки фото
-    if abs(int(now[:2]) * 60 + int(now[3:]) - int(start_time[:2]) * 60 - int(start_time[3:])) > 12:
+    time_now = datetime.datetime.strptime(now, "%H:%M").time()
+    start_dt = datetime.datetime.strptime(start_time, "%H:%M").time()
+    end_dt = datetime.datetime.strptime(end_time, "%H:%M").time()
+    
+    if abs((datetime.datetime.combine(datetime.date.today(), time_now) - 
+            datetime.datetime.combine(datetime.date.today(), start_dt)).total_seconds()) > 720:
         PENALTIES[user_id] = PENALTIES.get(user_id, 0) + 1
         await update.message.reply_text("Фото отправлено слишком поздно! Вам начислен штраф.")
         return
     
     # Выбираем случайное сообщение
-    message_text = random.choice(START_MESSAGES if now <= end_time else END_MESSAGES)
+    message_text = random.choice(START_MESSAGES if time_now <= end_dt else END_MESSAGES)
     
-    # Здесь должна быть отправка фото в нужный канал (замените CHANNEL_ID)
+    # Отправляем фото в канал
     CHANNEL_ID = "@your_channel_here"
-    await context.bot.send_photo(chat_id=CHANNEL_ID, photo=update.message.photo[-1].file_id, caption=message_text)
-    await update.message.reply_text("Фото успешно опубликовано!")
+    try:
+        await context.bot.send_photo(chat_id=CHANNEL_ID, photo=update.message.photo[-1].file_id, caption=message_text)
+        await update.message.reply_text("Фото успешно опубликовано!")
+    except Exception as e:
+        logging.error(f"Ошибка при отправке фото: {e}")
+        await update.message.reply_text("Ошибка при публикации фото. Попробуйте позже.")
 
 async def penalties(update: Update, context: CallbackContext) -> None:
-    if str(update.message.from_user.id) != ADMIN_ID:
+    if update.message.from_user.id != ADMIN_ID:
         return
     
     report = "Статистика штрафов:\n"
@@ -104,14 +106,11 @@ async def penalties(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(report)
 
 async def reset_penalties(update: Update, context: CallbackContext) -> None:
-    if str(update.message.from_user.id) != ADMIN_ID:
+    if update.message.from_user.id != ADMIN_ID:
         return
     
     PENALTIES.clear()
     await update.message.reply_text("Штрафы обнулены.")
-# Проверяем подключение к Google Таблице
-data = sheet.get_all_values()  # Считываем все данные из таблицы
-print(data)  # Выводим их в консоль
 
 # Запускаем бота
 def main():
