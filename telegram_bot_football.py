@@ -104,6 +104,9 @@ async def reset_penalties(update: Update, context: CallbackContext) -> None:
     
     PENALTIES.clear()
     await update.message.reply_text("Штрафы обнулены.")
+# Проверяем подключение к Google Таблице
+data = sheet.get_all_values()  # Считываем все данные из таблицы
+print(data)  # Выводим их в консоль
 
 # Запускаем бота
 def main():
