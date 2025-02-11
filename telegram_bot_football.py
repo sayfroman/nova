@@ -7,6 +7,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 import datetime
 import random
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
@@ -103,8 +105,14 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     
     if abs((datetime.datetime.combine(datetime.date.today(), time_now) - 
             datetime.datetime.combine(datetime.date.today(), start_dt)).total_seconds()) > 720:
+        # Штраф за опоздание
         PENALTIES[user_id] = PENALTIES.get(user_id, 0) + 1
-        await update.message.reply_text("Фото отправлено слишком поздно! Вам начислен штраф.")
+        await update.message.reply_text("Фотография отправлена слишком поздно и не принята. Вам начислен 1 штраф в виде 30% от оплаты за тренировку. Старайтесь отправлять фото вовремя.")
+        keyboard = [
+            [InlineKeyboardButton("Посмотреть штрафы", callback_data="view_penalties")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Посмотрите ваши штрафы:", reply_markup=reply_markup)
         return
     
     # Выбираем случайное сообщение
@@ -141,6 +149,21 @@ async def reset_penalties(update: Update, context: CallbackContext) -> None:
     
     PENALTIES.clear()
     await update.message.reply_text("Штрафы обнулены.")
+
+# Функция для ежемесячного отчета
+async def send_penalty_report():
+    report = "Статистика штрафов за месяц:\n"
+    for trainer, count in PENALTIES.items():
+        report += f"Тренер {trainer}: {count} штрафов\n"
+    
+    for admin_id in ADMIN_IDS:
+        await context.bot.send_message(chat_id=admin_id, text=report)
+    
+    PENALTIES.clear()
+
+# Планируем отправку отчета 1-го числа каждого месяца
+scheduler = AsyncIOScheduler()
+scheduler.add_job(send_penalty_report, CronTrigger(day=1, hour=0, minute=0))
 
 # Запускаем бота
 def main():
