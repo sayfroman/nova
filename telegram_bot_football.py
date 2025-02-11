@@ -5,6 +5,8 @@ import gspread
 from google.oauth2.service_account import Credentials
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+import datetime
+import random
 
 # Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +26,7 @@ except json.JSONDecodeError as e:
 
 # Подключаемся к Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-credentials = ServiceAccountCredentials.from_json_keyfile_dict(service_account_info, scope)
+credentials = Credentials.from_service_account_info(service_account_info, scopes=scope)
 gc = gspread.authorize(credentials)
 sheet = gc.open("Football_Schedule").sheet1  # Укажите точное название таблицы
 
@@ -86,12 +88,15 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     
     # Отправляем фото в канал
     CHANNEL_ID = "@your_channel_here"
-    try:
-        await context.bot.send_photo(chat_id=CHANNEL_ID, photo=update.message.photo[-1].file_id, caption=message_text)
-        await update.message.reply_text("Фото успешно опубликовано!")
-    except Exception as e:
-        logging.error(f"Ошибка при отправке фото: {e}")
-        await update.message.reply_text("Ошибка при публикации фото. Попробуйте позже.")
+    if update.message.photo:
+        try:
+            await context.bot.send_photo(chat_id=CHANNEL_ID, photo=update.message.photo[-1].file_id, caption=message_text)
+            await update.message.reply_text("Фото успешно опубликовано!")
+        except Exception as e:
+            logging.error(f"Ошибка при отправке фото: {e}")
+            await update.message.reply_text("Ошибка при публикации фото. Попробуйте позже.")
+    else:
+        await update.message.reply_text("Фото не найдено!")
 
 async def penalties(update: Update, context: CallbackContext) -> None:
     if update.message.from_user.id != ADMIN_ID:
