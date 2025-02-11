@@ -6,7 +6,11 @@ SERVICE_ACCOUNT_FILE = "solus-382301-5cbc0fd8d8cf.json"  # <-- Здесь впи
 
 # 2. Настроим доступ к Google Sheets API
 scopes = ["https://www.googleapis.com/auth/spreadsheets"]
-creds = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=scopes)
+import json
+import os
+
+service_account_info = json.loads(os.getenv("GOOGLE_CREDENTIALS"))
+creds = Credentials.from_service_account_info(service_account_info, scopes=scopes)
 client = gspread.authorize(creds)
 
 # 3. Подключаем Google Таблицу по её ID
