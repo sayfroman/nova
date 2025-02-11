@@ -13,7 +13,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Получаем токен бота из переменных окружения
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = os.getenv("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ")
 ADMIN_ID = os.getenv("ADMIN_ID")  # ID администратора
 
 # Пример данных тренеров и филиалов
