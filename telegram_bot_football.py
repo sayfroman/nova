@@ -48,18 +48,18 @@ ADMIN_IDS = [5385649, 7368748440]
 
 # Примеры сообщений
 START_MESSAGES = [
-       """🏆 Тренировка началась! Команда уже на поле!
+    """🏆 Тренировка началась! Команда уже на поле!
     🏆 Mashg’ulot boshlandi! Jamoa maydonda!""",
     """⚽ Дети начали разминку, занятие в разгаре!
-    ⚽ Bolalar qizishishni boshladi, mashg’ulot qizg’in davom etmoqda!""",
+    ⚽ Bolalar qizishishni boshladi, mashg’ulot qizg‘in davom etmoqda!""",
     """🚀 Поехали! Наши юные футболисты уже тренируются! 
-    🚀 Ketdik! Yosh futbolchilarimiz allaqachon mashg’ulotda!""",
+    🚀 Ketdik! Yosh futbolchilarimiz allaqachon mashg‘ulotda!""",
     """🔥 Тренировка стартовала! Сегодня работаем на максимум!
-    🔥 Mashg’ulot start oldi! Bugun maksimal darajada ishlaymiz!""",
+    🔥 Mashg‘ulot start oldi! Bugun maksimal darajada ishlaymiz!""",
     """💪 Мяч в игре! Начинаем занятие!
     💪 To‘p o‘yinda! Mashg‘ulotni boshladik!""",
     """⚡ Команда готова, тренировка в самом разгаре!
-    ⚡ Jamoa tayyor, mashg’ulot qizg’in ketmoqda!""",
+    ⚡ Jamoa tayyor, mashg‘ulot qizg‘in ketmoqda!""",
     """🏟️ Поле занято нашими чемпионами – тренировка идет!
     🏟️ Maydon bizning chempionlar bilan to‘ldi – mashg‘ulot boshlandi!""",
     """⏳ Без опозданий – разминка началась!
@@ -87,11 +87,12 @@ START_MESSAGES = [
     """🕒 Время тренировок! Сегодня снова растем!
     🕒 Mashg‘ulot vaqti! Bugun yana rivojlanamiz!""",
     """⚙️ Отрабатываем технику – тренировка в полном разгаре!
-    ⚙️ Texnikani mashq qilamiz – mashg‘ulot qizg‘in ketmoqda!""
+    ⚙️ Texnikani mashq qilamiz – mashg‘ulot qizg‘in ketmoqda!"""
 ]
+
 END_MESSAGES = [
     """✅ Тренировка окончена! Все отлично потрудились!
-    ✅ Mashg’ulot tugadi! Hammasi zo‘r ishladi!""",
+    ✅ Mashg‘ulot tugadi! Hammasi zo‘r ishladi!""",
     """🏁 Финиш! Дети завершили занятие!
     🏁 Finish! Bolalar mashg‘ulotni tugatdi!""",
     """⚽ Тренировка подошла к концу, можно забирать игроков!
