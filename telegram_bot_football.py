@@ -235,8 +235,8 @@ if start_dt <= now <= (datetime.datetime.combine(datetime.date.today(), start_dt
                     await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
                     return
 
-        # Фотография конца тренировки
-        if (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time() <= now <= end_dt:
+# Фотография конца тренировки
+if (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time() <= now <= end_dt:
             if update.message.photo:
                 try:
                     if 'end_photo_sent' not in context.chat_data:
@@ -251,7 +251,7 @@ if start_dt <= now <= (datetime.datetime.combine(datetime.date.today(), start_dt
                     await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
                     return
 
-    await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
+await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
 
 # Обработка кнопки "Отправить конечное фото"
 async def handle_end_photo_button(update: Update, context: CallbackContext) -> None:
