@@ -125,7 +125,7 @@ END_MESSAGES = [
     """🔔 Финальный звонок, тренировка завершена!
     🔔 Yakuniy hushtak chalindi, mashg‘ulot tugadi!""",
     """🏆 Все отработано, теперь можно отдыхать!
-    🏆 Hammasi a’lo bajarildi, endi esa dam olish vaqti!""",
+    🏆 Hammasi a’lo bajarildi, endi esa dam olish vaqti!"""
 ]
 
 # Хранение штрафов
