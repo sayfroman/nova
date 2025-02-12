@@ -59,15 +59,21 @@ def get_trainer_info(user_id):
         data = sheet.get_all_records()
         for row in data:
             if "Trainer_ID" in row and str(row["Trainer_ID"]) == str(user_id):
-                return row["Branch"], row["Start_Time"], row["End_Time"], row["Channel_ID"], row.get("Days_of_Week", "")
+                return row["Branch"], row["Start_Time"], row["End_Time"], row["Channel_ID"], row.get("Days_of_Week", ""), row.get("Trainer_Name", "Тренер")
     except Exception as e:
         logging.error(f"Ошибка при получении данных из Google Sheets: {e}")
-    return None, None, None, None, None
+    return None, None, None, None, None, "Тренер"
 
 # Команда /start
 async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
     data = sheet.get_all_records()
+    
+    trainer_name = "Тренер"
+    for row in data:
+        if str(row.get("Trainer_ID", "")) == str(user_id):
+            trainer_name = row.get("Trainer_Name", "Тренер")
+            break
     
     if not any(str(row.get("Trainer_ID", "")) == str(user_id) for row in data):
         await update.message.reply_text(
@@ -77,7 +83,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 
     keyboard = [[InlineKeyboardButton("Отправить фото", callback_data="send_photo")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Привет! Выберите команду:", reply_markup=reply_markup)
+    await update.message.reply_text(f"Привет, {trainer_name}! Выберите команду:", reply_markup=reply_markup)
 
 # Обработка фото
 async def handle_photo(update: Update, context: CallbackContext) -> None:
@@ -85,7 +91,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     now = datetime.datetime.now(TASHKENT_TZ).time()
     current_day = datetime.datetime.now(TASHKENT_TZ).strftime("%A")
     
-    branch, start_time, end_time, channel_id, days_of_week = get_trainer_info(user_id)
+    branch, start_time, end_time, channel_id, days_of_week, trainer_name = get_trainer_info(user_id)
     if not branch:
         await update.message.reply_text("Вы не зарегистрированы как тренер!")
         return
@@ -96,7 +102,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
 
     days_of_week_list = [day.strip() for day in days_of_week.split(",")]
     if current_day not in days_of_week_list:
-        await update.message.reply_text(f"Сегодня нет тренировки. Ваши дни: {', '.join(days_of_week_list)}.")
+        await update.message.reply_text(f"{trainer_name}, сегодня нет тренировки. Ваши дни: {', '.join(days_of_week_list)}.")
         return
     
     try:
@@ -115,7 +121,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
 
     if time_difference_start > 720 and time_difference_end > 720:
         PENALTIES[user_id] = PENALTIES.get(user_id, 0) + 1
-        await update.message.reply_text("Фото отправлено слишком поздно! Вам начислен штраф.")
+        await update.message.reply_text(f"{trainer_name}, фото отправлено слишком поздно! Вам начислен штраф.")
         return
 
     # Выбор сообщения
@@ -130,7 +136,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     if update.message.photo:
         try:
             await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text)
-            await update.message.reply_text("Фото успешно опубликовано!")
+            await update.message.reply_text(f"{trainer_name}, фото успешно опубликовано!")
         except Exception as e:
             logging.error(f"Ошибка отправки фото: {e}")
             await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
