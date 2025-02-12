@@ -112,30 +112,18 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Ошибка в данных расписания. Проверьте Google Таблицу.")
         return
 
-    # Проверка штрафов
-    time_difference_start = abs((datetime.datetime.combine(datetime.date.today(), now) - 
-                                 datetime.datetime.combine(datetime.date.today(), start_dt)).total_seconds())
-    
-    time_difference_end = abs((datetime.datetime.combine(datetime.date.today(), now) - 
-                               datetime.datetime.combine(datetime.date.today(), end_dt)).total_seconds())
-
-    if time_difference_start > 720 and time_difference_end > 720:
-        PENALTIES[user_id] = PENALTIES.get(user_id, 0) + 1
-        await update.message.reply_text(f"{trainer_name}, фото отправлено слишком поздно! Вам начислен штраф.")
+    # Проверка времени тренировки
+    if now < start_dt or now > end_dt:
+        await update.message.reply_text(f"{trainer_name}, сейчас не время для фотоотчета. Ваша тренировка по расписанию: {start_time} - {end_time}.")
         return
-
+    
     # Выбор сообщения
-    if time_difference_start <= 720:
-        message_text = random.choice(START_MESSAGES)
-    elif time_difference_end <= 720:
-        message_text = random.choice(END_MESSAGES)
-    else:
-        message_text = "Фото получено, но не соответствует времени тренировки."
-
+    message_text = random.choice(START_MESSAGES if now < end_dt else END_MESSAGES)
+    
     # Отправка фото
     if update.message.photo:
         try:
-            await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text)
+            await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отправить еще одно фото", callback_data="send_photo")]]))
             await update.message.reply_text(f"{trainer_name}, фото успешно опубликовано!")
         except Exception as e:
             logging.error(f"Ошибка отправки фото: {e}")
