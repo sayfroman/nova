@@ -1,111 +1,130 @@
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import os
+import json
 import logging
-from datetime import datetime, timedelta
+import gspread
+from google.oauth2.service_account import Credentials
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+import datetime
+import random
 import pytz
-from telegram import Bot
-from telegram.ext import Updater, CallbackContext
 
-# Указываем часовой пояс Ташкента
-tashkent_tz = pytz.timezone('Asia/Tashkent')
-
-# Настройки логирования
+# Настраиваем логирование
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Авторизация в Google Sheets
+# Устанавливаем часовой пояс Ташкента
+TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
+
+# Получаем учетные данные Google из переменной окружения
+credentials_json = os.getenv("GOOGLE_CREDENTIALS")
+if not credentials_json:
+    logging.error("Переменная окружения GOOGLE_CREDENTIALS не установлена или пуста!")
+    raise ValueError("GOOGLE_CREDENTIALS environment variable is missing or empty")
+
+try:
+    service_account_info = json.loads(credentials_json)
+except json.JSONDecodeError as e:
+    logging.error(f"Ошибка при разборе JSON GOOGLE_CREDENTIALS: {e}")
+    raise ValueError("Invalid JSON format in GOOGLE_CREDENTIALS")
+
+# Подключаемся к Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client = gspread.authorize(creds)
-sheet = client.open("Football_School").sheet1
+credentials = Credentials.from_service_account_info(service_account_info, scopes=scope)
+gc = gspread.authorize(credentials)
+sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1
 
-# Токен бота
-BOT_TOKEN = "7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ"
-bot = Bot(token=BOT_TOKEN)
+# Получаем токен бота из переменных окружения
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_IDS = [5385649, 7368748440]  # ID администраторов
 
-# Получение расписания тренеров
-def get_trainer_schedule():
-    data = sheet.get_all_records()
-    schedule = {}
-    for row in data:
-        trainer_id = row["Trainer_ID"]
-        schedule[trainer_id] = {
-            "name": row["Trainer_Name"],
-            "branch": row["Branch"],
-            "start_time": row["Start_Time"],
-            "end_time": row["End_Time"],
-            "channel_id": row["Channel_ID"],
-            "days_of_week": row["Days_of_Week"].split(", ")
-        }
-    return schedule
+# Пример текстов для публикации
+START_MESSAGES = [
+    "Уважаемые родители, тренировка началась!",
+    "Добрый день! Тренировка стартовала!",
+    "Дети приступили к занятиям."
+]
+END_MESSAGES = [
+    "Тренировка завершена, дети могут идти домой.",
+    "Занятие окончено, ждем всех в следующий раз!",
+    "Тренировка завершена. Хорошего вечера!"
+]
 
-# Функция напоминаний
-def send_reminders(context: CallbackContext):
-    schedule = get_trainer_schedule()
-    now = datetime.now(tashkent_tz)
-    today = now.strftime("%A")
-    
-    for trainer_id, trainer_info in schedule.items():
-        if today in trainer_info["days_of_week"]:
-            start_time = datetime.strptime(trainer_info["start_time"], "%H:%M").time()
-            start_datetime = datetime.combine(now.date(), start_time).astimezone(tashkent_tz)
-            
-            # Напоминание за 1 час до тренировки
-            if now + timedelta(hours=1) >= start_datetime > now:
-                bot.send_message(chat_id=trainer_id, text="Через час у вас тренировка. Не забудьте отправить фотоотчеты вовремя.")
-            
-            # Напоминание в момент начала тренировки
-            if now >= start_datetime and now < start_datetime + timedelta(minutes=1):
-                bot.send_message(chat_id=trainer_id, text="Тренировка началась. Не забудьте отправить фото 📸")
+# Хранение штрафов
+PENALTIES = {}
 
-# Функция проверки времени отправки фото
-def should_accept_photo(trainer_id):
-    schedule = get_trainer_schedule()
-    now = datetime.now(tashkent_tz)
-    today = now.strftime("%A")
-    
-    if trainer_id not in schedule:
-        return False, "Вы не зарегистрированы в системе."
-    
-    trainer_info = schedule[trainer_id]
-    if today not in trainer_info["days_of_week"]:
-        return False, "Сегодня у вас нет тренировки. Если возникла ошибка, свяжитесь с менеджером."
-    
-    start_time = datetime.strptime(trainer_info["start_time"], "%H:%M").time()
-    end_time = datetime.strptime(trainer_info["end_time"], "%H:%M").time()
-    
-    start_datetime = datetime.combine(now.date(), start_time).astimezone(tashkent_tz)
-    end_datetime = datetime.combine(now.date(), end_time).astimezone(tashkent_tz)
-    
-    if now < start_datetime - timedelta(minutes=12):
-        return False, "Тренировка еще не началась. Отправьте фото ближе ко времени начала."
-    
-    if now > end_datetime + timedelta(minutes=15):
-        return False, "Вы опоздали с фотоотчетом. Учтите, что за опоздание вам будет назначен штраф в размере 30% от гонорара за эту тренировку."
-    
-    return True, ""
+# Функция для получения информации о тренере
+def get_trainer_info(user_id):
+    try:
+        data = sheet.get_all_records()
+        for row in data:
+            if str(row["Trainer_ID"]) == str(user_id):
+                return row["Branch"], row["Start_Time"], row["End_Time"], row["Channel_ID"], row["Days_of_Week"]
+    except Exception as e:
+        logging.error(f"Ошибка при получении данных из Google Sheets: {e}")
+    return None, None, None, None, None
 
-# Обработка фото
-def process_photo(trainer_id, photo):
-    accepted, message = should_accept_photo(trainer_id)
-    if not accepted:
-        return message
-    
-    schedule = get_trainer_schedule()
-    trainer_info = schedule[trainer_id]
-    channel_id = trainer_info["channel_id"]
-    
-    if not channel_id:
-        logger.warning(f"Нет указанного Channel_ID для филиала {trainer_info['branch']}")
-        return f"Внимание! У филиала {trainer_info['branch']} не указан канал для публикации. Добавьте Channel_ID в таблицу."
-    
-    bot.send_photo(chat_id=channel_id, photo=photo, caption=f"Фотоотчет от {trainer_info['name']} ({trainer_info['branch']})")
-    
-    return "Фото успешно опубликовано."
+# Функция старта
+async def start(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    if user_id not in [trainer["Trainer_ID"] for trainer in sheet.get_all_records()]:
+        await update.message.reply_text(
+            "Простите, но у вас нет доступа к использованию этого бота. Он создан только для тренерского штаба NOVA Football Uzbekistan."
+        )
+        return
 
-# Запуск периодического обновления расписания и напоминаний
-updater = Updater(token=BOT_TOKEN, use_context=True)
-job_queue = updater.job_queue
-job_queue.run_repeating(send_reminders, interval=600, first=10)  # Каждые 10 минут
-updater.start_polling()
-updater.idle()
+    keyboard = [
+        [InlineKeyboardButton("Отправить фото", callback_data="send_photo")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("Привет! Выберите команду:", reply_markup=reply_markup)
+
+# Функция для обработки фото
+async def handle_photo(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    now = datetime.datetime.now(TASHKENT_TZ).strftime("%H:%M")
+    current_day = datetime.datetime.now(TASHKENT_TZ).strftime("%A")
+    
+    branch, start_time, end_time, channel_id, days_of_week = get_trainer_info(user_id)
+    if not branch:
+        await update.message.reply_text("Вы не зарегистрированы как тренер!")
+        return
+    
+    days_of_week_list = [day.strip() for day in days_of_week.split(",")]
+    if current_day not in days_of_week_list:
+        await update.message.reply_text(f"Сегодня не тренировка. Тренировка у вас в следующие дни: {', '.join(days_of_week_list)}.")
+        return
+    
+    time_now = datetime.datetime.strptime(now, "%H:%M").time()
+    start_dt = datetime.datetime.strptime(start_time, "%H:%M").time()
+    end_dt = datetime.datetime.strptime(end_time, "%H:%M").time()
+    
+    if abs((datetime.datetime.combine(datetime.date.today(), time_now) - 
+            datetime.datetime.combine(datetime.date.today(), start_dt)).total_seconds()) > 720:
+        PENALTIES[user_id] = PENALTIES.get(user_id, 0) + 1
+        await update.message.reply_text("Фото отправлено слишком поздно! Вам начислен штраф.")
+        return
+    
+    message_text = random.choice(START_MESSAGES if time_now <= end_dt else END_MESSAGES)
+    
+    if update.message.photo:
+        try:
+            await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text)
+            await update.message.reply_text("Фото успешно опубликовано!")
+        except Exception as e:
+            logging.error(f"Ошибка при отправке фото: {e}")
+            await update.message.reply_text("Ошибка при публикации фото. Попробуйте позже.")
+    else:
+        await update.message.reply_text("Фото не найдено!")
+
+# Запускаем бота
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
+    logger.info("Бот запущен...")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
