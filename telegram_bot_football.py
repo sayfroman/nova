@@ -215,10 +215,10 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
                 await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption="Фото окончания тренировки отправлено!")
                 return
     
-    await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
+await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
 
-        # Фотография начала тренировки
-        if start_dt <= now <= (datetime.datetime.combine(datetime.date.today(), start_dt) + datetime.timedelta(minutes=12)).time():
+# Фотография начала тренировки
+if start_dt <= now <= (datetime.datetime.combine(datetime.date.today(), start_dt) + datetime.timedelta(minutes=12)).time():
             if update.message.photo:
                 try:
                     if 'start_photo_sent' not in context.chat_data:
