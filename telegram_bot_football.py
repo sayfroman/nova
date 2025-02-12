@@ -90,16 +90,16 @@ START_MESSAGES = [
     ⚙️ Texnikani mashq qilamiz – mashg‘ulot qizg‘in ketmoqda!""
 ]
 END_MESSAGES = [
-       """✅ Тренировка окончена! Все отлично потрудились!
+    """✅ Тренировка окончена! Все отлично потрудились!
     ✅ Mashg’ulot tugadi! Hammasi zo‘r ishladi!""",
     """🏁 Финиш! Дети завершили занятие!
-    🏁 Finish! Bolalar mashg‘ulotni tugatdi""",
+    🏁 Finish! Bolalar mashg‘ulotni tugatdi!""",
     """⚽ Тренировка подошла к концу, можно забирать игроков!
     ⚽ Mashg‘ulot tugadi, futbolchilarni olib ketish mumkin!""",
     """🔥 Отличная работа! Сегодня ребята показали класс!
     🔥 Ajoyib ish! Bugun bolalar juda yaxshi harakat qilishdi!""",
     """💪 Все потрудились на славу! До следующей тренировки!
-    💪 Hamma a’lo darajada ishladi Keyingi mashg‘ulotda ko‘rishamiz!""",
+    💪 Hamma a’lo darajada ishladi! Keyingi mashg‘ulotda ko‘rishamiz!""",
     """🚀 Занятие завершено, ждем вас на следующем!
     🚀 Mashg‘ulot yakunlandi, keyingisini kutamiz!""",
     """🏆 Тренировка закончена, впереди восстановление и отдых!
@@ -125,10 +125,8 @@ END_MESSAGES = [
     """🔔 Финальный звонок, тренировка завершена!
     🔔 Yakuniy hushtak chalindi, mashg‘ulot tugadi!""",
     """🏆 Все отработано, теперь можно отдыхать!
-    🏆 Hammasi a’lo bajarildi, endi esa dam olish vaqti!"""
+    🏆 Hammasi a’lo bajarildi, endi esa dam olish vaqti!""",
 ]
-
-
 
 # Хранение штрафов
 PENALTIES = {}
