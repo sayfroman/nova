@@ -246,8 +246,47 @@ def main():
     job_queue = app.job_queue
     job_queue.run_repeating(update_google_sheet_data, interval=300, first=0)
     
+    # Добавляем задачу напоминаний каждую минуту
+    job_queue.run_repeating(send_training_reminders, interval=60, first=0)
+    
     logger.info("Бот запущен...")
     app.run_polling()
+
+async def send_training_reminders(context: CallbackContext):
+    """Функция отправляет уведомления тренерам о предстоящей тренировке."""
+    now = datetime.datetime.now(TASHKENT_TZ).time()
+    current_day = datetime.datetime.now(TASHKENT_TZ).strftime("%A")
+    
+    data = sheet.get_all_records()
+    for row in data:
+        try:
+            start_dt = datetime.datetime.strptime(row["Start_Time"], "%H:%M").time()
+            trainer_id = row.get("Trainer_ID")
+            trainer_name = row.get("Trainer_Name", "Тренер")
+            days_of_week_list = [day.strip() for day in row.get("Days_of_Week", "").split(",")]
+
+            if current_day not in days_of_week_list:
+                continue
+
+            time_diffs = {
+                "1_hour": datetime.timedelta(hours=1),
+                "30_minutes": datetime.timedelta(minutes=30),
+                "2_minutes": datetime.timedelta(minutes=2),
+            }
+
+            reminders = {
+                "1_hour": "🚀 Через час у вас начинается тренировка. Не забудьте отправить фото вовремя!",
+                "30_minutes": "⚡ Через полчаса начало тренировки. Убедитесь, что вы готовы!",
+                "2_minutes": "⚽ Тренировка начинается, не забудьте отправить фотографию!",
+            }
+
+            for key, delta in time_diffs.items():
+                reminder_time = (datetime.datetime.combine(datetime.date.today(), start_dt) - delta).time()
+                if now >= reminder_time and now < (datetime.datetime.combine(datetime.date.today(), reminder_time) + datetime.timedelta(minutes=1)).time():
+                    await context.bot.send_message(chat_id=trainer_id, text=reminders[key])
+
+        except Exception as e:
+            logging.error(f"Ошибка при отправке напоминаний: {e}")
 
 if __name__ == "__main__":
     main()
