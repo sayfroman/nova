@@ -199,8 +199,13 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         except ValueError:
             continue
         
+        start_early = (datetime.datetime.combine(datetime.date.today(), start_dt) - datetime.timedelta(minutes=5)).time()
+        start_late = (datetime.datetime.combine(datetime.date.today(), start_dt) + datetime.timedelta(minutes=12)).time()
+        end_early = (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time()
+        end_late = (datetime.datetime.combine(datetime.date.today(), end_dt) + datetime.timedelta(minutes=12)).time()
+        
         # Фотография начала тренировки
-        if start_dt <= now <= (datetime.datetime.combine(datetime.date.today(), start_dt) + datetime.timedelta(minutes=12)).time():
+        if start_early <= now <= start_late:
             if update.message.photo:
                 try:
                     if 'start_photo_sent' not in context.chat_data:
@@ -216,9 +221,9 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
                     logging.error(f"Ошибка отправки фото: {e}")
                     await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
                     return
-
+        
         # Фотография конца тренировки
-        if (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time() <= now <= end_dt:
+        if end_early <= now <= end_late:
             if update.message.photo:
                 try:
                     if 'end_photo_sent' not in context.chat_data:
@@ -232,8 +237,47 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
                     logging.error(f"Ошибка отправки фото: {e}")
                     await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
                     return
-
+        
     await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
+
+# Обработка нажатия на кнопку "Отправить конечное фото"
+async def handle_end_photo_request(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = query.from_user.id
+    now = datetime.datetime.now(TASHKENT_TZ).time()
+    
+    trainer_sessions = get_trainer_info(user_id)
+    if not trainer_sessions:
+        await query.answer()
+        await query.message.reply_text("Вы не зарегистрированы как тренер!")
+        return
+    
+    for session in trainer_sessions:
+        end_dt = datetime.datetime.strptime(session["end_time"], "%H:%M").time()
+        end_early = (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time()
+        end_late = (datetime.datetime.combine(datetime.date.today(), end_dt) + datetime.timedelta(minutes=12)).time()
+        
+        if now < end_early:
+            await query.answer()
+            await query.message.reply_text("Вы отправляете фото не в то время. Тренировка еще не закончена.")
+            return
+        elif now > end_late:
+            await query.answer()
+            await query.message.reply_text("Тренировка закончилась слишком давно. Вы опоздали с фотоотчетом, вам начислен штраф.", reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("Подробнее о штрафах", callback_data="fine_info")
+            ]]))
+            return
+
+# Обработка информации о штрафах
+async def handle_fine_info(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text(
+        "Если фотография отправляется не вовремя, тренеру назначается штраф 30% от суммы гонорара за эту тренировку. "
+        "Фотоотчеты нужно отправлять в начале за 5 минут до начала тренировки или в течение 12 минут после ее начала. "
+        "А также за 12 минут до окончания тренировки и в течение 12 минут после окончания."
+    )
+
 
 # Запуск бота
 def main():
