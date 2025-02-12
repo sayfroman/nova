@@ -48,84 +48,84 @@ ADMIN_IDS = [5385649, 7368748440]
 
 # Примеры сообщений
 START_MESSAGES = [
-    "🏆 Тренировка началась! Команда уже на поле!
-    🏆 Mashg’ulot boshlandi! Jamoa maydonda!",
-    "⚽ Дети начали разминку, занятие в разгаре!
-    ⚽ Bolalar qizishishni boshladi, mashg’ulot qizg’in davom etmoqda!",
-    "🚀 Поехали! Наши юные футболисты уже тренируются! 
-    🚀 Ketdik! Yosh futbolchilarimiz allaqachon mashg’ulotda!",
-    "🔥 Тренировка стартовала! Сегодня работаем на максимум!
-    🔥 Mashg’ulot start oldi! Bugun maksimal darajada ishlaymiz!",
-    "💪 Мяч в игре! Начинаем занятие!
-    💪 To‘p o‘yinda! Mashg‘ulotni boshladik!",
-    "⚡ Команда готова, тренировка в самом разгаре!
-    ⚡ Jamoa tayyor, mashg’ulot qizg’in ketmoqda!",
-    "🏟️ Поле занято нашими чемпионами – тренировка идет!
-    🏟️ Maydon bizning chempionlar bilan to‘ldi – mashg‘ulot boshlandi!",
-    "⏳ Без опозданий – разминка началась!
-    ⏳ Kechikmang – qizishish allaqachon boshlandi!",
-    "🥅 Все на месте, тренировка в полном разгаре!
-    🥅 Hamma joyida, mashg‘ulot qizg‘in davom etmoqda!",
-    "🌟 Стартуем! Сегодня – еще один шаг к победе!
-    🌟 Boshladik! Bugun yana bir g‘alabaga yaqinlashamiz!",
-    "📢 Внимание, родители! Тренировка началась, работаем по плану!
-    📢 Diqqat, ota-onalar! Mashg‘ulot boshlandi, rejaga muvofiq ishlayapmiz!",
-    "👟 Дети на поле, первые удары по мячу уже звучат!
-    👟 Bolalar maydonda, to‘pga dastlabki zarbalar berildi!",
-    "💥 Заряжаемся энергией – тренировка в действии!
-    💥 Energiyani yig‘amiz – mashg‘ulot davom etmoqda!",
-    "🏋️‍♂️ Физическая подготовка началась, готовимся к игре!
-    🏋️‍♂️ Jismoniy tayyorgarlik boshlandi, o‘yin uchun hozirlik ko‘ramiz!",
-    "🚦 Зелёный свет! Тренировка пошла!
-    🚦 Yashil chiroq! Mashg‘ulot boshlandi!",
-    "🎯 Фокус на игре – тренировка запущена!
-    🎯 E’tibor faqat o‘yinda – mashg‘ulot boshlandi!",
-    "📅 По расписанию: начало тренировки!
-    📅 Rejaga muvofiq: mashg‘ulot boshlandi!",
-    "🎶 Свисток прозвучал – команда в работе!
-    🎶 Hushtak chalindi – jamoa harakatda!",
-    "🕒 Время тренировок! Сегодня снова растем!
-    🕒 Mashg‘ulot vaqti! Bugun yana rivojlanamiz!",
-    "⚙️ Отрабатываем технику – тренировка в полном разгаре!
-    ⚙️ Texnikani mashq qilamiz – mashg‘ulot qizg‘in ketmoqda!"
+    """🏆 Тренировка началась! Команда уже на поле!
+    🏆 Mashg’ulot boshlandi! Jamoa maydonda!""",
+    """⚽ Дети начали разминку, занятие в разгаре!
+    ⚽ Bolalar qizishishni boshladi, mashg’ulot qizg’in davom etmoqda!""",
+    """🚀 Поехали! Наши юные футболисты уже тренируются! 
+    🚀 Ketdik! Yosh futbolchilarimiz allaqachon mashg’ulotda!""",
+    """🔥 Тренировка стартовала! Сегодня работаем на максимум!
+    🔥 Mashg’ulot start oldi! Bugun maksimal darajada ishlaymiz!""",
+    """💪 Мяч в игре! Начинаем занятие!
+    💪 To‘p o‘yinda! Mashg‘ulotni boshladik!""",
+    """⚡ Команда готова, тренировка в самом разгаре!
+    ⚡ Jamoa tayyor, mashg’ulot qizg’in ketmoqda!""",
+    """🏟️ Поле занято нашими чемпионами – тренировка идет!
+    🏟️ Maydon bizning chempionlar bilan to‘ldi – mashg‘ulot boshlandi!""",
+    """⏳ Без опозданий – разминка началась!
+    ⏳ Kechikmang – qizishish allaqachon boshlandi!""",
+    """🥅 Все на месте, тренировка в полном разгаре!
+    🥅 Hamma joyida, mashg‘ulot qizg‘in davom etmoqda!""",
+    """🌟 Стартуем! Сегодня – еще один шаг к победе!
+    🌟 Boshladik! Bugun yana bir g‘alabaga yaqinlashamiz!""",
+    """📢 Внимание, родители! Тренировка началась, работаем по плану!
+    📢 Diqqat, ota-onalar! Mashg‘ulot boshlandi, rejaga muvofiq ishlayapmiz!""",
+    """👟 Дети на поле, первые удары по мячу уже звучат!
+    👟 Bolalar maydonda, to‘pga dastlabki zarbalar berildi!""",
+    """💥 Заряжаемся энергией – тренировка в действии!
+    💥 Energiyani yig‘amiz – mashg‘ulot davom etmoqda!""",
+    """🏋️‍♂️ Физическая подготовка началась, готовимся к игре!
+    🏋️‍♂️ Jismoniy tayyorgarlik boshlandi, o‘yin uchun hozirlik ko‘ramiz!""",
+    """🚦 Зелёный свет! Тренировка пошла!
+    🚦 Yashil chiroq! Mashg‘ulot boshlandi!""",
+    """🎯 Фокус на игре – тренировка запущена!
+    🎯 E’tibor faqat o‘yinda – mashg‘ulot boshlandi!""",
+    """📅 По расписанию: начало тренировки!
+    📅 Rejaga muvofiq: mashg‘ulot boshlandi!""",
+    """🎶 Свисток прозвучал – команда в работе!
+    🎶 Hushtak chalindi – jamoa harakatda!""",
+    """🕒 Время тренировок! Сегодня снова растем!
+    🕒 Mashg‘ulot vaqti! Bugun yana rivojlanamiz!""",
+    """⚙️ Отрабатываем технику – тренировка в полном разгаре!
+    ⚙️ Texnikani mashq qilamiz – mashg‘ulot qizg‘in ketmoqda!"""
 ]
 END_MESSAGES = [    
-    "✅ Тренировка окончена! Все отлично потрудились!
-    ✅ Mashg’ulot tugadi! Hammasi zo‘r ishladi!",
-    "🏁 Финиш! Дети завершили занятие!
-    🏁 Finish! Bolalar mashg‘ulotni tugatdi",
-    "⚽ Тренировка подошла к концу, можно забирать игроков!
-    ⚽ Mashg‘ulot tugadi, futbolchilarni olib ketish mumkin!",
-    "🔥 Отличная работа! Сегодня ребята показали класс!
-    🔥 Ajoyib ish! Bugun bolalar juda yaxshi harakat qilishdi!",
-    "💪 Все потрудились на славу! До следующей тренировки!
-    💪 Hamma a’lo darajada ishladi Keyingi mashg‘ulotda ko‘rishamiz!",
-    "🚀 Занятие завершено, ждем вас на следующем!
-    🚀 Mashg‘ulot yakunlandi, keyingisini kutamiz!",
-    "🏆 Тренировка закончена, впереди восстановление и отдых!
-    🏆 Mashg‘ulot tugadi, oldinda dam olish va tiklanish!",
-    "🎉 Молодцы! Сегодняшняя тренировка – еще один шаг к успеху!
-    🎉 Ajoyib ish! Bugungi mashg‘ulot g‘alabaga yana bir qadam!",
-    "⚡ Все выложились на максимум, пора отдыхать!
-    ⚡ Hamma bor kuchini berdi, endi dam olish vaqti!",
-    "⏳ Занятие завершено, можно забирать будущих чемпионов!
-    ⏳ Mashg‘ulot yakunlandi, kelajakdagi chempionlarni olib ketish mumkin!",
-    "🏅 Финальный свисток – тренировка окончена!
-    🏅 Yakuniy hushtak – mashg‘ulot tugadi!",
-    "📢 Внимание, родители! Тренировка завершена, всех можно забирать!
-    📢 Diqqat, ota-onalar! Mashg‘ulot tugadi, bolalarni olib ketishingiz mumkin!",
-    "🎯 Цели на сегодня выполнены, молодцы!
-    🎯 Bugungi maqsadlar bajarildi, zo‘r ish!",
-    "💥 Футбольный день завершен, встречаемся на следующем занятии!
-    💥 Futbol kuni yakunlandi, keyingi mashg‘ulotda ko‘rishamiz!",
-    "🕒 Время закончилось – тренировка подошла к концу!
-    🕒 Vaqt tugadi – mashg‘ulot yakunlandi!",
-    "🥇 Достойная игра! Теперь на заслуженный отдых!
-    🥇 Munosib o‘yin! Endi esa yaxshi dam olish kerak!",
-    "🔔 Финальный звонок, тренировка завершена!
-    🔔 Yakuniy hushtak chalindi, mashg‘ulot tugadi!",
-    "🏆 Все отработано, теперь можно отдыхать!
-    🏆 Hammasi a’lo bajarildi, endi esa dam olish vaqti!",
+    """✅ Тренировка окончена! Все отлично потрудились!
+    ✅ Mashg’ulot tugadi! Hammasi zo‘r ishladi!""",
+    """🏁 Финиш! Дети завершили занятие!
+    🏁 Finish! Bolalar mashg‘ulotni tugatdi""",
+    """⚽ Тренировка подошла к концу, можно забирать игроков!
+    ⚽ Mashg‘ulot tugadi, futbolchilarni olib ketish mumkin!""",
+    """🔥 Отличная работа! Сегодня ребята показали класс!
+    🔥 Ajoyib ish! Bugun bolalar juda yaxshi harakat qilishdi!""",
+    """💪 Все потрудились на славу! До следующей тренировки!
+    💪 Hamma a’lo darajada ishladi Keyingi mashg‘ulotda ko‘rishamiz!""",
+    """🚀 Занятие завершено, ждем вас на следующем!
+    🚀 Mashg‘ulot yakunlandi, keyingisini kutamiz!""",
+    """🏆 Тренировка закончена, впереди восстановление и отдых!
+    🏆 Mashg‘ulot tugadi, oldinda dam olish va tiklanish!""",
+    """🎉 Молодцы! Сегодняшняя тренировка – еще один шаг к успеху!
+    🎉 Ajoyib ish! Bugungi mashg‘ulot g‘alabaga yana bir qadam!""",
+    """⚡ Все выложились на максимум, пора отдыхать!
+    ⚡ Hamma bor kuchini berdi, endi dam olish vaqti!""",
+    """⏳ Занятие завершено, можно забирать будущих чемпионов!
+    ⏳ Mashg‘ulot yakunlandi, kelajakdagi chempionlarni olib ketish mumkin!""",
+    """🏅 Финальный свисток – тренировка окончена!
+    🏅 Yakuniy hushtak – mashg‘ulot tugadi!""",
+    """📢 Внимание, родители! Тренировка завершена, всех можно забирать!
+    📢 Diqqat, ota-onalar! Mashg‘ulot tugadi, bolalarni olib ketishingiz mumkin!""",
+    """🎯 Цели на сегодня выполнены, молодцы!
+    🎯 Bugungi maqsadlar bajarildi, zo‘r ish!""",
+    """💥 Футбольный день завершен, встречаемся на следующем занятии!
+    💥 Futbol kuni yakunlandi, keyingi mashg‘ulotda ko‘rishamiz!""",
+    """🕒 Время закончилось – тренировка подошла к концу!
+    🕒 Vaqt tugadi – mashg‘ulot yakunlandi!""",
+    """🥇 Достойная игра! Теперь на заслуженный отдых!
+    🥇 Munosib o‘yin! Endi esa yaxshi dam olish kerak!""",
+    """🔔 Финальный звонок, тренировка завершена!
+    🔔 Yakuniy hushtak chalindi, mashg‘ulot tugadi!""",
+    """🏆 Все отработано, теперь можно отдыхать!
+    🏆 Hammasi a’lo bajarildi, endi esa dam olish vaqti!"""
 ]
 
 # Хранение штрафов
