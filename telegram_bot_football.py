@@ -3,7 +3,7 @@ import json
 import logging
 import gspread
 from google.oauth2.service_account import Credentials
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, JobQueue
 import datetime
 import random
@@ -48,7 +48,7 @@ ADMIN_IDS = [5385649, 7368748440]
 
 # Примеры сообщений
 START_MESSAGES = [
-    """🏆 Тренировка началась! Команда уже на поле!
+       """🏆 Тренировка началась! Команда уже на поле!
     🏆 Mashg’ulot boshlandi! Jamoa maydonda!""",
     """⚽ Дети начали разминку, занятие в разгаре!
     ⚽ Bolalar qizishishni boshladi, mashg’ulot qizg’in davom etmoqda!""",
@@ -87,7 +87,7 @@ START_MESSAGES = [
     """🕒 Время тренировок! Сегодня снова растем!
     🕒 Mashg‘ulot vaqti! Bugun yana rivojlanamiz!""",
     """⚙️ Отрабатываем технику – тренировка в полном разгаре!
-    ⚙️ Texnikani mashq qilamiz – mashg‘ulot qizg‘in ketmoqda!"""
+    ⚙️ Texnikani mashq qilamiz – mashg‘ulot qizg‘in ketmoqda!""
 ]
 END_MESSAGES = [    
     """✅ Тренировка окончена! Все отлично потрудились!
@@ -198,19 +198,40 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         except ValueError:
             continue
         
-        if start_dt <= now <= end_dt:
-            message_text = random.choice(START_MESSAGES if now < end_dt else END_MESSAGES)
-            
+        # Фотография начала тренировки
+        if start_dt <= now <= (datetime.datetime.combine(datetime.date.today(), start_dt) + datetime.timedelta(minutes=12)).time():
             if update.message.photo:
                 try:
-                    await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=message_text)
-                    await update.message.reply_text(f"{session['trainer_name']}, фото успешно опубликовано!")
-                    return
+                    if 'start_photo_sent' not in context.chat_data:
+                        await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(START_MESSAGES))
+                        context.chat_data['start_photo_sent'] = True
+                        await update.message.reply_text(f"{session['trainer_name']}, фото начала тренировки отправлено! Нажмите кнопку ниже для отправки фото окончания тренировки.", reply_markup=InlineKeyboardMarkup([[
+                            InlineKeyboardButton("Отправить конечное фото", callback_data="send_end_photo")
+                        ]]))
+                        return
+                    else:
+                        await update.message.reply_text("Нужна только одна фотография. Все остальные записи с тренировки отправляйте менеджеру в чат.")
                 except Exception as e:
                     logging.error(f"Ошибка отправки фото: {e}")
                     await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
                     return
-    
+
+        # Фотография конца тренировки
+        if (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time() <= now <= end_dt:
+            if update.message.photo:
+                try:
+                    if 'end_photo_sent' not in context.chat_data:
+                        await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(END_MESSAGES))
+                        context.chat_data['end_photo_sent'] = True
+                        await update.message.reply_text(f"{session['trainer_name']}, фото окончания тренировки отправлено!")
+                        return
+                    else:
+                        await update.message.reply_text("Нужна только одна фотография. Все остальные записи с тренировки отправляйте менеджеру в чат.")
+                except Exception as e:
+                    logging.error(f"Ошибка отправки фото: {e}")
+                    await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
+                    return
+
     await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
 
 # Запуск бота
