@@ -3,7 +3,7 @@ import json
 import logging
 import gspread
 from google.oauth2.service_account import Credentials
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 import datetime
 import random
@@ -32,7 +32,7 @@ except json.JSONDecodeError as e:
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 credentials = Credentials.from_service_account_info(service_account_info, scopes=scope)
 gc = gspread.authorize(credentials)
-sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1  # Используем ID таблицы
+sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1
 
 # Получение токена бота
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -81,8 +81,8 @@ async def start(update: Update, context: CallbackContext) -> None:
         )
         return
 
-    keyboard = [[InlineKeyboardButton("Отправить фото", callback_data="send_photo")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    keyboard = [["Отправить фото"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
     await update.message.reply_text(f"Привет, {trainer_name}! Выберите команду:", reply_markup=reply_markup)
 
 # Обработка фото
@@ -123,7 +123,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     # Отправка фото
     if update.message.photo:
         try:
-            await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text, reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отправить еще одно фото", callback_data="send_photo")]]))
+            await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=message_text)
             await update.message.reply_text(f"{trainer_name}, фото успешно опубликовано!")
         except Exception as e:
             logging.error(f"Ошибка отправки фото: {e}")
