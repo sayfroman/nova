@@ -126,7 +126,6 @@ END_MESSAGES = [
     🔔 Yakuniy hushtak chalindi, mashg‘ulot tugadi!""",
     """🏆 Все отработано, теперь можно отдыхать!
     🏆 Hammasi a’lo bajarildi, endi esa dam olish vaqti!"""
-
 ]
 
 
