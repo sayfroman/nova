@@ -1,197 +1,261 @@
+# Импорт необходимых библиотек
 import os
 import json
 import logging
 import gspread
 from google.oauth2.service_account import Credentials
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, ContextTypes
+from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, JobQueue
 import datetime
-import pytz
 import random
-import asyncio
+import pytz
 
-# ==============================
-# Настройка логирования
-# ==============================
+# Логирование
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ==============================
-# Конфигурация часового пояса
-# ==============================
+# Часовой пояс Ташкента
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
-# ==============================
-# Проверка переменных окружения
-# ==============================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not BOT_TOKEN:
-    logging.error("Переменная BOT_TOKEN не установлена!")
-    raise ValueError("Переменная BOT_TOKEN отсутствует!")
-
+# Получение учетных данных Google
+# Эта часть кода отвечает за получение учетных данных для доступа к Google Sheets
 credentials_json = os.getenv("GOOGLE_CREDENTIALS")
 if not credentials_json:
-    logging.error("Переменная GOOGLE_CREDENTIALS не установлена!")
+    logging.error("Переменная окружения GOOGLE_CREDENTIALS не установлена!")
     raise ValueError("Переменная GOOGLE_CREDENTIALS отсутствует!")
 
-# ==============================
-# Подключение к Google Sheets
-# ==============================
 try:
     service_account_info = json.loads(credentials_json)
 except json.JSONDecodeError as e:
     logging.error(f"Ошибка разбора JSON GOOGLE_CREDENTIALS: {e}")
     raise ValueError("Неверный формат JSON в GOOGLE_CREDENTIALS")
 
+# Подключение к Google Sheets
+# Подключение к Google Sheets с использованием полученных учетных данных
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 credentials = Credentials.from_service_account_info(service_account_info, scopes=scope)
 gc = gspread.authorize(credentials)
 sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1
-fines_sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").worksheet("Fines")
 
-# ==============================
-# Текстовые шаблоны сообщений
-# ==============================
-START_TEXTS = [
-    "Тренировка началась! Давайте покажем максимум! 💪⚽",
-    "Начало тренировки! Готовимся к лучшим моментам! 🔥",
-    "Стартуем! Сегодня мы станем сильнее! 🚀"
+# Функция обновления данных из Google Sheets
+# Эта функция обновляет данные из Google Sheets каждые 5 минут
+def update_google_sheet_data(context: CallbackContext):
+    global sheet
+    try:
+        sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1
+        logger.info("Данные из Google Sheets обновлены")
+    except Exception as e:
+        logger.error(f"Ошибка обновления Google Sheets: {e}")
+
+# Получение токена бота и настроек
+# Здесь находятся настройки бота, такие как токен и ID администраторов
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_IDS = [5385649, 7368748440]
+
+# Примеры сообщений
+# Сообщения, которые будут отправляться при начале и окончании тренировки
+START_MESSAGES = [
+    """🏆 Тренировка началась! Команда уже на поле!
+    🏆 Mashg’ulot boshlandi! Jamoa maydonda!""",
 ]
 
-END_TEXTS = [
-    "Тренировка завершена! Отличная работа, ребята! 👏",
-    "Конец тренировки! Молодцы, продолжаем в том же духе! 🔥",
-    "Завершили! Отличный результат, команда! 💯"
-
+END_MESSAGES = [
+    """✅ Тренировка окончена! Все отлично потрудились!
+    ✅ Mashg‘ulot tugadi! Hammasi zo‘r ishladi!""",
 ]
 
-REMINDER_TEXTS = [
-    "Напоминание: Ваша тренировка начинается через {minutes} минут! 🏆",
-    "Скоро тренировка! Осталось {minutes} минут. Готовьтесь! ⚽",
-    "Не забывайте: до начала вашей тренировки всего {minutes} минут! ⏳"
-]
+# Хранение штрафов
+# Здесь будет храниться информация о штрафах тренеров
+PENALTIES = {}
 
-# ==============================
-# Получение расписания из Google Sheets
-# ==============================
-def get_schedule():
+# Функция получения данных тренера
+# Эта функция получает информацию о тренере из Google Sheets
+def get_trainer_info(user_id):
     try:
         data = sheet.get_all_records()
-        logging.info(f"Загружено расписание: {data}")
-        return {str(row['Trainer_ID']): row for row in data}
+        trainer_sessions = []
+        for row in data:
+            if "Trainer_ID" in row and str(row["Trainer_ID"]) == str(user_id):
+                trainer_sessions.append({
+                    "branch": row["Branch"],
+                    "start_time": row["Start_Time"],
+                    "end_time": row["End_Time"],
+                    "channel_id": row["Channel_ID"],
+                    "days_of_week": row.get("Days_of_Week", ""),
+                    "trainer_name": row.get("Trainer_Name", "Тренер")
+                })
+        return trainer_sessions
     except Exception as e:
-        logger.error(f"Ошибка загрузки данных: {e}")
-        return {}
+        logging.error(f"Ошибка при получении данных из Google Sheets: {e}")
+    return []
 
-# ==============================
-# Конфигурация бота
-# ==============================
-ADMIN_IDS = ["5385649", "7368748440"]
-
-TRAINER_KEYBOARD = ReplyKeyboardMarkup([
-    ["Отправить начало тренировки"],
-    ["Отправить конец тренировки"],
-    ["Мои штрафы"]
-], resize_keyboard=True)
-
-ADMIN_KEYBOARD = ReplyKeyboardMarkup([
-    ["Опубликовать фото за тренера"],
-    ["Посмотреть все штрафы"],
-    ["Обратиться к тренеру"]
-], resize_keyboard=True)
-
-# ==============================
-# Обработка команды /start
-# ==============================
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user_id = str(update.message.from_user.id)
-        schedule = get_schedule()
-
-        if user_id in ADMIN_IDS:
-            await update.message.reply_text("Добро пожаловать, администратор!", reply_markup=ADMIN_KEYBOARD)
-        elif user_id in schedule:
-            await update.message.reply_text(
-                "Добро пожаловать в NOVA Assistant! Выберите команду и отправьте фото начала или конца тренировки.",
-                reply_markup=TRAINER_KEYBOARD
-            )
-        else:
-            await update.message.reply_text("Вы не зарегистрированы в системе. Обратитесь к администратору.")
-    except Exception as e:
-        logger.error(f"Ошибка в команде /start: {e}")
-        await update.message.reply_text("Произошла ошибка. Попробуйте снова позже.")
-
-# ==============================
-# Проверка времени тренировки
-# ==============================
-async def check_training_time(user_id: str):
-    schedule = get_schedule()
-    if user_id not in schedule:
-        return None
+# Команда /start
+# Обработчик команды /start, который приветствует тренера
+async def start(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    data = sheet.get_all_records()
     
-    now = datetime.datetime.now(TASHKENT_TZ)
-    user_schedule = schedule[user_id]
-    training_start = datetime.datetime.strptime(user_schedule["Start_Time"], "%H:%M").time()
-    training_end = datetime.datetime.strptime(user_schedule["End_Time"], "%H:%M").time()
-    return training_start, training_end
+    trainer_name = "Тренер"
+    for row in data:
+        if str(row.get("Trainer_ID", "")) == str(user_id):
+            trainer_name = row.get("Trainer_Name", "Тренер")
+            break
+    
+    if not any(str(row.get("Trainer_ID", "")) == str(user_id) for row in data):
+        await update.message.reply_text(
+            "Простите, но у вас нет доступа. Бот создан только для тренерского штаба NOVA Football Uzbekistan."
+        )
+        return
 
-# ==============================
-# Фиксация штрафов
-# ==============================
-async def log_fine(user_id: str, reason: str):
-    now = datetime.datetime.now(TASHKENT_TZ).strftime("%d-%m-%Y %H:%M")
-    fines_sheet.append_row([user_id, reason, now])
+    keyboard = [["Отправить фото"]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+    await update.message.reply_text(f"Привет, {trainer_name}! Выберите команду:", reply_markup=reply_markup)
 
-# ==============================
-# Обработка кнопки "Мои штрафы"
-# ==============================
-async def my_fines(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        user_id = str(update.message.from_user.id)
-        fines = fines_sheet.get_all_records()
-        user_fines = [fine for fine in fines if fine["user_id"] == user_id]
-        if user_fines:
-            message = "Ваши штрафы:\n" + "\n".join([f"{fine['reason']} - {fine['date']}" for fine in user_fines])
-        else:
-            message = "У вас нет штрафов."
-        await update.message.reply_text(message)
-    except Exception as e:
-        logger.error(f"Ошибка при запросе штрафов: {e}")
-        await update.message.reply_text("Ошибка при получении штрафов.")
+# Обработчик нажатия на кнопку "Отправить фото"
+# Этот обработчик запрашивает фото от тренера
+async def handle_photo_request(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text("Пожалуйста, отправьте фото для отчета.")
 
-# ==============================
-# Обработка кнопки "Отправить начало тренировки"
-# ==============================
-async def send_start_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        await update.message.reply_text(random.choice(START_TEXTS))
-    except Exception as e:
-        logger.error(f"Ошибка при отправке начала тренировки: {e}")
-        await update.message.reply_text("Ошибка при отправке начала тренировки.")
+# Обработка фото
+# Обработчик, который проверяет время тренировки и отправляет фото в канал
+async def handle_photo(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    now = datetime.datetime.now(TASHKENT_TZ).time()
+    current_day = datetime.datetime.now(TASHKENT_TZ).strftime("%A")
+    
+    # Проверка, отправляется ли фото в альбоме
+    if update.message.media_group_id:
+        await update.message.reply_text("Пожалуйста, отправьте фото отдельным сообщением, а не альбом.")
+        return
+    
+    trainer_sessions = get_trainer_info(user_id)
+    if not trainer_sessions:
+        await update.message.reply_text("Вы не зарегистрированы как тренер!")
+        return
+    
+    for session in trainer_sessions:
+        days_of_week_list = [day.strip() for day in session["days_of_week"].split(",")]
+        if current_day not in days_of_week_list:
+            continue
+        
+        try:
+            start_dt = datetime.datetime.strptime(session["start_time"], "%H:%M").time()
+            end_dt = datetime.datetime.strptime(session["end_time"], "%H:%M").time()
+        except ValueError:
+            continue
+        
+        start_early = (datetime.datetime.combine(datetime.date.today(), start_dt) - datetime.timedelta(minutes=5)).time()
+        start_late = (datetime.datetime.combine(datetime.date.today(), start_dt) + datetime.timedelta(minutes=12)).time()
+        end_early = (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time()
+        end_late = (datetime.datetime.combine(datetime.date.today(), end_dt) + datetime.timedelta(minutes=12)).time()
+        
+        # Фотография начала тренировки
+        if start_early <= now <= start_late:
+            if update.message.photo:
+                try:
+                    if f'start_photo_sent_{user_id}' not in context.chat_data:
+                        await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(START_MESSAGES))
+                        context.chat_data[f'start_photo_sent_{user_id}'] = True
+                        await update.message.reply_text(f"{session['trainer_name']}, фото начала тренировки отправлено! Нажмите кнопку ниже для отправки фото окончания тренировки.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отправить конечное фото", callback_data="send_end_photo")]]))
+                        return
+                    else:
+                        await update.message.reply_text("Нужна только одна фотография. Все остальные записи с тренировки отправляйте менеджеру в чат.")
+                except Exception as e:
+                    logging.error(f"Ошибка отправки фото: {e}")
+                    await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
+                    return
+        
+        # Фотография конца тренировки
+        if end_early <= now <= end_late:
+            if update.message.photo:
+                try:
+                    if f'end_photo_sent_{user_id}' not in context.chat_data:
+                        await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(END_MESSAGES))
+                        context.chat_data[f'end_photo_sent_{user_id}'] = True
+                        await update.message.reply_text(f"{session['trainer_name']}, фото окончания тренировки отправлено!")
+                        return
+                    else:
+                        await update.message.reply_text("Нужна только одна фотография. Все остальные записи с тренировки отправляйте менеджеру в чат.")
+                except Exception as e:
+                    logging.error(f"Ошибка отправки фото: {e}")
+                    await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
+                    return
+        
+    await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
 
-# ==============================
-# Напоминания о тренировках
-# ==============================
-async def send_reminders():
-    while True:
-        schedule = get_schedule()
-        now = datetime.datetime.now(TASHKENT_TZ).time()
-        for user_id, user_schedule in schedule.items():
-            training_start = datetime.datetime.strptime(user_schedule["Start_Time"], "%H:%M").time()
-            for minutes in [60, 30, 5]:
-                reminder_time = (datetime.datetime.combine(datetime.date.today(), training_start) - datetime.timedelta(minutes=minutes)).time()
-                if now.hour == reminder_time.hour and now.minute == reminder_time.minute:
-                    await app.bot.send_message(chat_id=user_id, text=random.choice(REMINDER_TEXTS).format(minutes=minutes))
-        await asyncio.sleep(60)
+# Обработка нажатия на кнопку "Отправить конечное фото"
+# Этот обработчик проверяет время для отправки конечного фото
+async def handle_end_photo_request(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    user_id = query.from_user.id
+    now = datetime.datetime.now(TASHKENT_TZ).time()
+    
+    trainer_sessions = get_trainer_info(user_id)
+    if not trainer_sessions:
+        await query.answer()
+        await query.message.reply_text("Вы не зарегистрированы как тренер!")
+        return
+    
+    for session in trainer_sessions:
+        end_dt = datetime.datetime.strptime(session["end_time"], "%H:%M").time()
+        end_early = (datetime.datetime.combine(datetime.date.today(), end_dt) - datetime.timedelta(minutes=12)).time()
+        end_late = (datetime.datetime.combine(datetime.date.today(), end_dt) + datetime.timedelta(minutes=12)).time()
+        
+        if now < end_early:
+            await query.answer()
+            await query.message.reply_text("Вы отправляете фото не в то время. Тренировка еще не закончена.")
+            return
+        elif now > end_late:
+            await query.answer()
+            await query.message.reply_text("Тренировка закончилась слишком давно. Вы опоздали с фотоотчетом, вам начислен штраф.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Подробнее о штрафах", callback_data="fine_info")]]))
+            return
 
-# ==============================
-# Регистрация команд бота
-# ==============================
-app = Application.builder().token(BOT_TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(MessageHandler(filters.Regex("Отправить начало тренировки"), send_start_training))
-app.add_handler(MessageHandler(filters.Regex("Мои штрафы"), my_fines))
-app.run_polling()
+# Обработка информации о штрафах
+# Этот обработчик отображает информацию о штрафах тренерам
+async def handle_fine_info(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()
+    await query.message.reply_text(
+        "Если фотография отправляется не вовремя, тренеру назначается штраф 30% от суммы гонорара за эту тренировку. "
+        "Фотоотчеты нужно отправлять в начале за 5 минут до начала тренировки или в течение 12 минут после ее начала. "
+        "А также за 12 минут до окончания тренировки и в течение 12 минут после окончания."
+    )
 
+# Запуск бота
+# Запускает бота и добавляет необходимые обработчики
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("^Отправить фото$"), handle_photo_request))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    
+    # Запуск задачи обновления данных из Google Sheets каждые 5 минут
+    job_queue = app.job_queue
+    job_queue.run_repeating(update_google_sheet_data, interval=300, first=0)
+    
+    # Добавляем задачу напоминаний каждую минуту
+    job_queue.run_repeating(send_training_reminders, interval=60, first=0)
+    
+    logger.info("Бот запущен...")
+    app.run_polling()
 
+# Отправка напоминаний о тренировках
+# Функция отправляет напоминания тренерам о предстоящих тренировках
+async def send_training_reminders(context: CallbackContext):
+    """Функция напоминания о начале тренировки"""
+    now = datetime.datetime.now(TASHKENT_TZ).time()
+    for user_id in ADMIN_IDS:
+        trainer_sessions = get_trainer_info(user_id)
+        for session in trainer_sessions:
+            start_time = datetime.datetime.strptime(session["start_time"], "%H:%M").time()
+            if now == (datetime.datetime.combine(datetime.date.today(), start_time) - datetime.timedelta(minutes=60)).time():
+                await context.bot.send_message(user_id, "Напоминание: тренировка через 1 час.")
+            if now == (datetime.datetime.combine(datetime.date.today(), start_time) - datetime.timedelta(minutes=30)).time():
+                await context.bot.send_message(user_id, "Напоминание: тренировка через 30 минут.")
+            if now == (datetime.datetime.combine(datetime.date.today(), start_time) - datetime.timedelta(minutes=5)).time():
+                await context.bot.send_message(user_id, "Напоминание: тренировка через 5 минут.")
+            if now == (datetime.datetime.combine(datetime.date.today(), start_time) - datetime.timedelta(minutes=10)).time():
+                await context.bot.send_message(user_id, "Напоминание: тренировка скоро!")
 
+if __name__ == "__main__":
+    main()
