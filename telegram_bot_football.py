@@ -46,8 +46,17 @@ def get_schedule():
         logger.error(f"Ошибка загрузки данных: {e}")
         return {}
 
+def get_fines():
+    try:
+        fines_sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").worksheet("Fines")
+        data = fines_sheet.get_all_records()
+        return data
+    except Exception as e:
+        logger.error(f"Ошибка загрузки штрафов: {e}")
+        return []
+
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_IDS = [5385649, 7368748440]
+ADMIN_IDS = ["5385649", "7368748440"]  # Приводим ID администраторов к строке
 
 # Клавиатура для тренеров
 TRAINER_KEYBOARD = ReplyKeyboardMarkup([
@@ -69,6 +78,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"User ID: {user_id}")  # Логируем ID пользователя
     logger.info(f"Ключи в schedule: {list(schedule.keys())}")  # Логируем все Trainer_ID
+    logger.info(f"Администраторы: {ADMIN_IDS}")  # Логируем список администраторов
 
     if user_id in ADMIN_IDS:
         await update.message.reply_text("Добро пожаловать, администратор!", reply_markup=ADMIN_KEYBOARD)
@@ -81,40 +91,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Вы не зарегистрированы в системе. Обратитесь к администратору.")
 
-# Функция обработки фото
-async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def send_fines(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
-    schedule = get_schedule()
-    trainer_data = schedule.get(user_id)
-    
-    if not trainer_data:
-        await update.message.reply_text("Вы не зарегистрированы в системе.")
+    if user_id not in ADMIN_IDS:
         return
     
-    now = datetime.datetime.now(TASHKENT_TZ)
-    start_time = datetime.datetime.strptime(trainer_data['Start_Time'], "%H:%M").time()
-    end_time = datetime.datetime.strptime(trainer_data['End_Time'], "%H:%M").time()
-    
-    if context.user_data.get("last_command") == "start":
-        valid_from = (datetime.datetime.combine(now.date(), start_time) - datetime.timedelta(minutes=5)).time()
-        valid_to = (datetime.datetime.combine(now.date(), start_time) + datetime.timedelta(minutes=12)).time()
-    elif context.user_data.get("last_command") == "end":
-        valid_from = (datetime.datetime.combine(now.date(), end_time) - datetime.timedelta(minutes=10)).time()
-        valid_to = (datetime.datetime.combine(now.date(), end_time) + datetime.timedelta(minutes=12)).time()
-    else:
-        await update.message.reply_text("Сначала выберите команду.")
+    fines = get_fines()
+    if not fines:
+        await update.message.reply_text("На данный момент штрафов нет.")
         return
     
-    if not (valid_from <= now.time() <= valid_to):
-        await update.message.reply_text("Фотография отправлена в неверное время.")
-        return
+    fines_by_trainer = {}
+    for fine in fines:
+        trainer_name = fine['Trainer_Name']
+        date = fine['Date']
+        time = fine['Time']
+        if trainer_name not in fines_by_trainer:
+            fines_by_trainer[trainer_name] = []
+        fines_by_trainer[trainer_name].append(f"{date}, {time} — 1 штраф")
     
-    channel_id = trainer_data['Channel_ID']
-    messages = ["Тренировка началась!", "Начинаем тренировку!", "Поехали!"] if context.user_data['last_command'] == "start" else ["Тренировка завершена!", "Конец тренировки!", "Финиш!"]
-    caption = random.choice(messages)
+    message = "Статистика штрафов за текущий месяц:\n"
+    for trainer, records in fines_by_trainer.items():
+        message += f"\n🔹 {trainer}\n" + "\n".join(records) + "\n"
     
-    await context.bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=caption)
-    await update.message.reply_text("Фотография опубликована. Спасибо большое!")
+    await update.message.reply_text(message)
 
 async def send_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['last_command'] = "start"
@@ -127,11 +127,12 @@ async def send_end(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Настройка команд
 app = Application.builder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("stats", send_fines))
 app.add_handler(MessageHandler(filters.Regex("Отправить начало тренировки"), send_start))
 app.add_handler(MessageHandler(filters.Regex("Отправить конец тренировки"), send_end))
-app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
 # Запуск бота
 if __name__ == "__main__":
     logger.info("Запуск бота...")
     app.run_polling()
+
