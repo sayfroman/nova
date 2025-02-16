@@ -62,6 +62,11 @@ END_TEXTS = [
     "Тренировка завершена! Отличная работа, ребята! 👏",
     "Конец тренировки! Молодцы, продолжаем в том же духе! 🔥",
     "Завершили! Отличный результат, команда! 💯"
+
+REMINDER_TEXTS = [
+    "Напоминание: Ваша тренировка начинается через {minutes} минут! 🏆",
+    "Скоро тренировка! Осталось {minutes} минут. Готовьтесь! ⚽",
+    "Не забывайте: до начала вашей тренировки всего {minutes} минут! ⏳"
 ]
 
 # ==============================
@@ -153,6 +158,31 @@ async def my_fines(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Ошибка при получении штрафов.")
 
 # ==============================
+# Обработка кнопки "Отправить начало тренировки"
+# ==============================
+async def send_start_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        await update.message.reply_text(random.choice(START_TEXTS))
+    except Exception as e:
+        logger.error(f"Ошибка при отправке начала тренировки: {e}")
+        await update.message.reply_text("Ошибка при отправке начала тренировки.")
+
+# ==============================
+# Напоминания о тренировках
+# ==============================
+async def send_reminders():
+    while True:
+        schedule = get_schedule()
+        now = datetime.datetime.now(TASHKENT_TZ).time()
+        for user_id, user_schedule in schedule.items():
+            training_start = datetime.datetime.strptime(user_schedule["Start_Time"], "%H:%M").time()
+            for minutes in [60, 30, 5]:
+                reminder_time = (datetime.datetime.combine(datetime.date.today(), training_start) - datetime.timedelta(minutes=minutes)).time()
+                if now.hour == reminder_time.hour and now.minute == reminder_time.minute:
+                    await app.bot.send_message(chat_id=user_id, text=random.choice(REMINDER_TEXTS).format(minutes=minutes))
+        await asyncio.sleep(60)
+
+# ==============================
 # Регистрация команд бота
 # ==============================
 app = Application.builder().token(BOT_TOKEN).build()
@@ -160,5 +190,6 @@ app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.Regex("Отправить начало тренировки"), send_start_training))
 app.add_handler(MessageHandler(filters.Regex("Мои штрафы"), my_fines))
 app.run_polling()
+
 
 
