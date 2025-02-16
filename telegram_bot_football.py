@@ -22,13 +22,21 @@ logger = logging.getLogger(__name__)
 TASHKENT_TZ = pytz.timezone("Asia/Tashkent")
 
 # ==============================
-# Подключение к Google Sheets
+# Проверка переменных окружения
 # ==============================
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    logging.error("Переменная BOT_TOKEN не установлена!")
+    raise ValueError("Переменная BOT_TOKEN отсутствует!")
+
 credentials_json = os.getenv("GOOGLE_CREDENTIALS")
 if not credentials_json:
-    logging.error("Переменная окружения GOOGLE_CREDENTIALS не установлена!")
+    logging.error("Переменная GOOGLE_CREDENTIALS не установлена!")
     raise ValueError("Переменная GOOGLE_CREDENTIALS отсутствует!")
 
+# ==============================
+# Подключение к Google Sheets
+# ==============================
 try:
     service_account_info = json.loads(credentials_json)
 except json.JSONDecodeError as e:
@@ -39,6 +47,7 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 credentials = Credentials.from_service_account_info(service_account_info, scopes=scope)
 gc = gspread.authorize(credentials)
 sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").sheet1
+fines_sheet = gc.open_by_key("19vkwWg7jt6T5zjy9XpgYPQz0BA7mtfpSAt6s1hGA53g").worksheet("Fines")
 
 # ==============================
 # Текстовые шаблоны сообщений
@@ -61,6 +70,7 @@ END_TEXTS = [
 def get_schedule():
     try:
         data = sheet.get_all_records()
+        logging.info(f"Загружено расписание: {data}")
         return {str(row['Trainer_ID']): row for row in data}  # Приводим ID к строке
     except Exception as e:
         logger.error(f"Ошибка загрузки данных: {e}")
@@ -69,7 +79,6 @@ def get_schedule():
 # ==============================
 # Конфигурация бота
 # ==============================
-BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_IDS = ["5385649", "7368748440"]
 
 TRAINER_KEYBOARD = ReplyKeyboardMarkup([
@@ -111,52 +120,41 @@ async def check_training_time(user_id: str):
     
     now = datetime.datetime.now(TASHKENT_TZ)
     user_schedule = schedule[user_id]
-    training_days = user_schedule["Days_of_Week"].split(", ")
-    today = now.strftime("%A")
-    if today not in training_days:
-        return None
-    
     training_start = datetime.datetime.strptime(user_schedule["Start_Time"], "%H:%M").time()
     training_end = datetime.datetime.strptime(user_schedule["End_Time"], "%H:%M").time()
-    if training_start <= now.time() <= training_end:
-        return True
-    return user_schedule["Days_of_Week"], user_schedule["Start_Time"], user_schedule["Branch"]
+    return training_start, training_end
 
 # ==============================
-# Просмотр штрафов
+# Фиксация штрафов
 # ==============================
-async def view_fines(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def log_fine(user_id: str, reason: str):
+    now = datetime.datetime.now(TASHKENT_TZ).strftime("%d-%m-%Y %H:%M")
+    fines_sheet.append_row([user_id, reason, now])
+
+# ==============================
+# Отправка начала тренировки
+# ==============================
+async def send_start_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
-    fines_data = sheet.get_all_records()
-    user_fines = next((row for row in fines_data if str(row['Trainer_ID']) == user_id), None)
-    fines_count = user_fines['Fines'] if user_fines else 0
+    schedule = get_schedule()
     
-    if fines_count:
-        await update.message.reply_text(f"В этом месяце у вас {fines_count} штраф(ов).")
+    if user_id not in schedule:
+        await update.message.reply_text("Вы не зарегистрированы в системе.")
+        return
+
+    training_start, training_end = await check_training_time(user_id)
+    now = datetime.datetime.now(TASHKENT_TZ).time()
+    if now > (datetime.datetime.combine(datetime.date.today(), training_start) + datetime.timedelta(minutes=10)).time():
+        await log_fine(user_id, "Опоздание на тренировку")
+        await update.message.reply_text("Вы опоздали на тренировку. Штраф зафиксирован.")
     else:
-        await update.message.reply_text("В текущем месяце штрафов нет.")
+        await update.message.reply_text(random.choice(START_TEXTS))
 
 # ==============================
-# Отправка напоминаний тренерам
+# Регистрация команд бота
 # ==============================
-async def send_reminders(app: Application):
-    while True:
-        schedule = get_schedule()
-        now = datetime.datetime.now(TASHKENT_TZ)
-        for user_id, details in schedule.items():
-            training_start = datetime.datetime.strptime(details["Start_Time"], "%H:%M").time()
-            training_end = datetime.datetime.strptime(details["End_Time"], "%H:%M").time()
-            
-            reminders = {
-                (datetime.datetime.combine(now.date(), training_start) - datetime.timedelta(minutes=60)).time(): "До тренировки остался 1 час! ⏳",
-                (datetime.datetime.combine(now.date(), training_start) - datetime.timedelta(minutes=30)).time(): "До тренировки осталось 30 минут! ⚽",
-                (datetime.datetime.combine(now.date(), training_start) - datetime.timedelta(minutes=5)).time(): "Через 5 минут начнется тренировка! 📢",
-                (datetime.datetime.combine(now.date(), training_end) - datetime.timedelta(minutes=10)).time(): "Тренировка заканчивается через 10 минут! 🕒"
-            }
-            
-            if now.strftime("%A") in details["Days_of_Week"].split(", ") and now.time() in reminders:
-                await app.bot.send_message(chat_id=user_id, text=reminders[now.time()])
-        await asyncio.sleep(60)
-
-
+app = Application.builder().token(BOT_TOKEN).build()
+app.add_handler(CommandHandler("start", start))
+app.add_handler(MessageHandler(filters.Regex("Отправить начало тренировки"), send_start_training))
+app.run_polling()
 
