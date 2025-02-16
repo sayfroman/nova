@@ -71,7 +71,7 @@ def get_schedule():
     try:
         data = sheet.get_all_records()
         logging.info(f"Загружено расписание: {data}")
-        return {str(row['Trainer_ID']): row for row in data}  # Приводим ID к строке
+        return {str(row['Trainer_ID']): row for row in data}
     except Exception as e:
         logger.error(f"Ошибка загрузки данных: {e}")
         return {}
@@ -97,18 +97,22 @@ ADMIN_KEYBOARD = ReplyKeyboardMarkup([
 # Обработка команды /start
 # ==============================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    schedule = get_schedule()
+    try:
+        user_id = str(update.message.from_user.id)
+        schedule = get_schedule()
 
-    if user_id in ADMIN_IDS:
-        await update.message.reply_text("Добро пожаловать, администратор!", reply_markup=ADMIN_KEYBOARD)
-    elif user_id in schedule:
-        await update.message.reply_text(
-            "Добро пожаловать в NOVA Assistant! Выберите команду и отправьте фото начала или конца тренировки.",
-            reply_markup=TRAINER_KEYBOARD
-        )
-    else:
-        await update.message.reply_text("Вы не зарегистрированы в системе. Обратитесь к администратору.")
+        if user_id in ADMIN_IDS:
+            await update.message.reply_text("Добро пожаловать, администратор!", reply_markup=ADMIN_KEYBOARD)
+        elif user_id in schedule:
+            await update.message.reply_text(
+                "Добро пожаловать в NOVA Assistant! Выберите команду и отправьте фото начала или конца тренировки.",
+                reply_markup=TRAINER_KEYBOARD
+            )
+        else:
+            await update.message.reply_text("Вы не зарегистрированы в системе. Обратитесь к администратору.")
+    except Exception as e:
+        logger.error(f"Ошибка в команде /start: {e}")
+        await update.message.reply_text("Произошла ошибка. Попробуйте снова позже.")
 
 # ==============================
 # Проверка времени тренировки
@@ -132,23 +136,21 @@ async def log_fine(user_id: str, reason: str):
     fines_sheet.append_row([user_id, reason, now])
 
 # ==============================
-# Отправка начала тренировки
+# Обработка кнопки "Мои штрафы"
 # ==============================
-async def send_start_training(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = str(update.message.from_user.id)
-    schedule = get_schedule()
-    
-    if user_id not in schedule:
-        await update.message.reply_text("Вы не зарегистрированы в системе.")
-        return
-
-    training_start, training_end = await check_training_time(user_id)
-    now = datetime.datetime.now(TASHKENT_TZ).time()
-    if now > (datetime.datetime.combine(datetime.date.today(), training_start) + datetime.timedelta(minutes=10)).time():
-        await log_fine(user_id, "Опоздание на тренировку")
-        await update.message.reply_text("Вы опоздали на тренировку. Штраф зафиксирован.")
-    else:
-        await update.message.reply_text(random.choice(START_TEXTS))
+async def my_fines(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        user_id = str(update.message.from_user.id)
+        fines = fines_sheet.get_all_records()
+        user_fines = [fine for fine in fines if fine["user_id"] == user_id]
+        if user_fines:
+            message = "Ваши штрафы:\n" + "\n".join([f"{fine['reason']} - {fine['date']}" for fine in user_fines])
+        else:
+            message = "У вас нет штрафов."
+        await update.message.reply_text(message)
+    except Exception as e:
+        logger.error(f"Ошибка при запросе штрафов: {e}")
+        await update.message.reply_text("Ошибка при получении штрафов.")
 
 # ==============================
 # Регистрация команд бота
@@ -156,5 +158,7 @@ async def send_start_training(update: Update, context: ContextTypes.DEFAULT_TYPE
 app = Application.builder().token(BOT_TOKEN).build()
 app.add_handler(CommandHandler("start", start))
 app.add_handler(MessageHandler(filters.Regex("Отправить начало тренировки"), send_start_training))
+app.add_handler(MessageHandler(filters.Regex("Мои штрафы"), my_fines))
 app.run_polling()
+
 
