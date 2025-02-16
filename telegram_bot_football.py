@@ -152,6 +152,12 @@ def get_trainer_info(user_id):
         logging.error(f"Ошибка при получении данных из Google Sheets: {e}")
     return []
 
+import datetime
+import random
+import logging
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup
+from telegram.ext import CallbackContext
+
 # Команда /start
 async def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
@@ -183,6 +189,11 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
     now = datetime.datetime.now(TASHKENT_TZ).time()
     current_day = datetime.datetime.now(TASHKENT_TZ).strftime("%A")
     
+    # Проверка, отправляется ли фото в альбоме
+    if update.message.media_group_id:
+        await update.message.reply_text("Пожалуйста, отправьте фото отдельным сообщением, а не альбомом.")
+        return
+    
     trainer_sessions = get_trainer_info(user_id)
     if not trainer_sessions:
         await update.message.reply_text("Вы не зарегистрированы как тренер!")
@@ -208,12 +219,10 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         if start_early <= now <= start_late:
             if update.message.photo:
                 try:
-                    if 'start_photo_sent' not in context.chat_data:
+                    if f'start_photo_sent_{user_id}' not in context.chat_data:
                         await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(START_MESSAGES))
-                        context.chat_data['start_photo_sent'] = True
-                        await update.message.reply_text(f"{session['trainer_name']}, фото начала тренировки отправлено! Нажмите кнопку ниже для отправки фото окончания тренировки.", reply_markup=InlineKeyboardMarkup([[
-                            InlineKeyboardButton("Отправить конечное фото", callback_data="send_end_photo")
-                        ]]))
+                        context.chat_data[f'start_photo_sent_{user_id}'] = True
+                        await update.message.reply_text(f"{session['trainer_name']}, фото начала тренировки отправлено! Нажмите кнопку ниже для отправки фото окончания тренировки.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отправить конечное фото", callback_data="send_end_photo")]]))
                         return
                     else:
                         await update.message.reply_text("Нужна только одна фотография. Все остальные записи с тренировки отправляйте менеджеру в чат.")
@@ -226,9 +235,9 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         if end_early <= now <= end_late:
             if update.message.photo:
                 try:
-                    if 'end_photo_sent' not in context.chat_data:
+                    if f'end_photo_sent_{user_id}' not in context.chat_data:
                         await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(END_MESSAGES))
-                        context.chat_data['end_photo_sent'] = True
+                        context.chat_data[f'end_photo_sent_{user_id}'] = True
                         await update.message.reply_text(f"{session['trainer_name']}, фото окончания тренировки отправлено!")
                         return
                     else:
@@ -263,10 +272,9 @@ async def handle_end_photo_request(update: Update, context: CallbackContext) -> 
             return
         elif now > end_late:
             await query.answer()
-            await query.message.reply_text("Тренировка закончилась слишком давно. Вы опоздали с фотоотчетом, вам начислен штраф.", reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("Подробнее о штрафах", callback_data="fine_info")
-            ]]))
+            await query.message.reply_text("Тренировка закончилась слишком давно. Вы опоздали с фотоотчетом, вам начислен штраф.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Подробнее о штрафах", callback_data="fine_info")]]))
             return
+
 
 # Обработка информации о штрафах
 async def handle_fine_info(update: Update, context: CallbackContext) -> None:
