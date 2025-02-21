@@ -247,8 +247,6 @@ if end_early <= now <= end_late:
             logging.error(f"Ошибка отправки фото: {e}")
             await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
             return
-        
-    await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
 
 # Обработка нажатия на кнопку "Отправить конечное фото"
 async def handle_end_photo_request(update: Update, context: CallbackContext) -> None:
