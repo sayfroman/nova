@@ -216,36 +216,37 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         end_late = (datetime.datetime.combine(datetime.date.today(), end_dt) + datetime.timedelta(minutes=12)).time()
         
         # Фотография начала тренировки
-        if start_early <= now <= start_late:
-            if update.message.photo:
-                try:
-                    if f'start_photo_sent_{user_id}' not in context.chat_data:
-                        await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(START_MESSAGES))
-                        context.chat_data[f'start_photo_sent_{user_id}'] = True
-                        await update.message.reply_text(f"{session['trainer_name']}, фото начала тренировки отправлено! Нажмите кнопку ниже для отправки фото окончания тренировки.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отправить конечное фото", callback_data="send_end_photo")]]))
-                        return
-                    else:
-                        await update.message.reply_text("Нужна только одна фотография. Все остальные записи с тренировки отправляйте менеджеру в чат.")
-                except Exception as e:
-                    logging.error(f"Ошибка отправки фото: {e}")
-                    await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
-                    return
-        
-        # Фотография конца тренировки
-        if end_early <= now <= end_late:
-            if update.message.photo:
-                try:
-                    if f'end_photo_sent_{user_id}' not in context.chat_data:
-                        await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(END_MESSAGES))
-                        context.chat_data[f'end_photo_sent_{user_id}'] = True
-                        await update.message.reply_text(f"{session['trainer_name']}, фото окончания тренировки отправлено!")
-                        return
-                    else:
-                        await update.message.reply_text("Нужна только одна фотография. Все остальные записи с тренировки отправляйте менеджеру в чат.")
-                except Exception as e:
-                    logging.error(f"Ошибка отправки фото: {e}")
-                    await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
-                    return
+if start_early <= now <= start_late:
+    if update.message.photo:
+        try:
+            session_key = f'start_photo_sent_{user_id}_{session["start_time"]}'
+            if session_key not in context.chat_data:
+                await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(START_MESSAGES))
+                context.chat_data[session_key] = True
+                await update.message.reply_text(f"{session['trainer_name']}, фото начала тренировки отправлено! Нажмите кнопку ниже для отправки фото окончания тренировки.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Отправить конечное фото", callback_data="send_end_photo")]]))
+                return
+            else:
+                await update.message.reply_text("Вы уже отправили фото начала этой тренировки.")
+        except Exception as e:
+            logging.error(f"Ошибка отправки фото: {e}")
+            await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
+            return
+
+if end_early <= now <= end_late:
+    if update.message.photo:
+        try:
+            session_key = f'end_photo_sent_{user_id}_{session["end_time"]}'
+            if session_key not in context.chat_data:
+                await context.bot.send_photo(chat_id=session["channel_id"], photo=update.message.photo[-1].file_id, caption=random.choice(END_MESSAGES))
+                context.chat_data[session_key] = True
+                await update.message.reply_text(f"{session['trainer_name']}, фото окончания тренировки отправлено!")
+                return
+            else:
+                await update.message.reply_text("Вы уже отправили фото окончания этой тренировки.")
+        except Exception as e:
+            logging.error(f"Ошибка отправки фото: {e}")
+            await update.message.reply_text("Ошибка при публикации. Попробуйте позже.")
+            return
         
     await update.message.reply_text("Сейчас не время для фотоотчета или у вас нет тренировки в это время.")
 
