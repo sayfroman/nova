@@ -34,11 +34,13 @@ def get_schedule():
     data = cursor.fetchall()
     return {row[0]: {"channel": row[1], "start": row[2], "end": row[3]} for row in data}
 
+
 def get_random_text(file_path):
     """Возвращает случайный текст из указанного TXT-файла."""
     with open(file_path, "r", encoding="utf-8") as file:
         texts = file.readlines()
     return random.choice(texts).strip()
+
 
 def log_penalty(trainer_id):
     """Записывает штраф в базу данных."""
@@ -47,9 +49,11 @@ def log_penalty(trainer_id):
     cursor.execute("INSERT INTO STRAFS (trainer_id, date) VALUES (%s, %s)", (trainer_id, datetime.now(TZ)))
     conn.commit()
 
+
 @dp.message_handler(commands=["start"])
 async def send_welcome(message: types.Message):
     await message.reply("Выберите действие:", reply_markup=start_end_keyboard)
+
 
 @dp.message_handler(lambda message: message.text in ["Отправить начало тренировки", "Отправить конец тренировки"])
 async def set_photo_type(message: types.Message):
@@ -60,6 +64,7 @@ async def set_photo_type(message: types.Message):
     else:
         trainer_state[user_id] = "end"
         await message.reply("Теперь отправьте фото конца тренировки.")
+
 
 @dp.message_handler(content_types=[types.ContentType.PHOTO])
 async def handle_photo(message: types.Message):
@@ -80,12 +85,12 @@ async def handle_photo(message: types.Message):
     start_time = datetime.strptime(schedule[user_id]["start"], "%H:%M").time()
     end_time = datetime.strptime(schedule[user_id]["end"], "%H:%M").time()
     
-    allowed_start = datetime.combine(now.date(), start_time) - timedelta(minutes=10)
-    allowed_end = datetime.combine(now.date(), end_time) + timedelta(minutes=10)
+    allowed_start = TZ.localize(datetime.combine(now.date(), start_time) - timedelta(minutes=10))
+    allowed_end = TZ.localize(datetime.combine(now.date(), end_time) + timedelta(minutes=10))
     
-    if photo_type == "start" and allowed_start <= now <= datetime.combine(now.date(), start_time) + timedelta(minutes=10):
+    if photo_type == "start" and allowed_start <= now <= TZ.localize(datetime.combine(now.date(), start_time) + timedelta(minutes=10)):
         caption = get_random_text(TXT_START)
-    elif photo_type == "end" and datetime.combine(now.date(), end_time) - timedelta(minutes=10) <= now <= allowed_end:
+    elif photo_type == "end" and TZ.localize(datetime.combine(now.date(), end_time) - timedelta(minutes=10)) <= now <= allowed_end:
         caption = get_random_text(TXT_END)
     else:
         await message.reply("Фотография отправлена не вовремя. Разрешается отправка за 10 минут до и в течение 10 минут после начала или конца тренировки")
@@ -96,17 +101,19 @@ async def handle_photo(message: types.Message):
     await bot.send_photo(chat_id=channel_id, photo=message.photo[-1].file_id, caption=caption)
     await message.reply("Фото успешно отправлено!")
 
+
 async def check_missed_reports():
     """Проверяет, кто не отправил фото вовремя, и уведомляет в общий чат."""
     schedule = get_schedule()
     now = datetime.now(TZ)
     for user_id, data in schedule.items():
         end_time = datetime.strptime(data["end"], "%H:%M").time()
-        deadline = datetime.combine(now.date(), end_time) + timedelta(minutes=10)
+        deadline = TZ.localize(datetime.combine(now.date(), end_time) + timedelta(minutes=10))
         
         if now > deadline:
             await bot.send_message(CHAT_ID, f"<b>{user_id}</b>, вы не отправили фотоотчет вовремя!", parse_mode="HTML")
             log_penalty(user_id)
+
 
 if __name__ == "__main__":
     executor.start_polling(dp, skip_updates=True)
