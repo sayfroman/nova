@@ -7,4 +7,4 @@ apscheduler
 pytz
 oauth2client
 psycopg2-binary
-aiogram
+aiogram==2.25.1
