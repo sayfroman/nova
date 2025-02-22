@@ -30,7 +30,7 @@ def get_schedule():
     """Получает расписание из базы данных."""
     conn = DB_CONNECTION
     cursor = conn.cursor()
-    cursor.execute("SELECT trainer_id, channel_id, start_time, end_time FROM \"NOVA TABLE\"")
+    cursor.execute("SELECT trainer_id, channel_id, start_time, end_time FROM \"NOVA-TABLE\"")
     data = cursor.fetchall()
     return {row[0]: {"channel": row[1], "start": row[2], "end": row[3]} for row in data}
 
