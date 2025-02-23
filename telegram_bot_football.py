@@ -5,7 +5,6 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from datetime import datetime, timedelta
 import pytz
 import json
-import asyncio
 
 # Загружаем переменные окружения
 from dotenv import load_dotenv
@@ -39,8 +38,9 @@ def save_json(filename, data):
     except Exception as e:
         logger.error(f"Ошибка сохранения данных в {filename}: {e}")
 
-schedule = load_json('schedule.json')
-penalties = load_json('penalties.json')
+# Пример структуры данных для schedule и penalties
+schedule = load_json('schedule.json') or {}
+penalties = load_json('penalties.json') or []
 
 # Создание бота
 bot = Bot(token=BOT_TOKEN)
@@ -143,4 +143,5 @@ async def main():
     await application.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(main())  # Запускаем асинхронную функцию main() через asyncio.run
+    import asyncio
+    asyncio.run(main())  # Запускаем асинхронную функцию main()
