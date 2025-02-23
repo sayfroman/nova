@@ -1,126 +1,128 @@
-import os
 import logging
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-from datetime import datetime, timedelta
-import pytz
 import json
+from datetime import datetime, timedelta
+from telegram import Update, Bot, ParseMode
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-# Загружаем переменные окружения
-from dotenv import load_dotenv
-load_dotenv()
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-if not BOT_TOKEN:
-    print("Ошибка: Не найден обязательный токен бота!")
-    exit(1)
-
-# Настройка логирования
-logging.basicConfig(level=logging.DEBUG)
+# Установим логирование для ошибок
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Часовой пояс
-TZ = pytz.timezone("Asia/Tashkent")
+# Глобальные переменные
+bot = None
+updater = None
+schedule_data = {}
+photo_time_window = timedelta(minutes=10)
 
-# Загружаем данные из файлов
-def load_json(filename):
+# Загрузка расписания тренеров
+def load_schedule():
+    global schedule_data
     try:
-        with open(filename, 'r', encoding='utf-8') as file:
-            return json.load(file)
+        with open('schedule.json', 'r') as file:
+            schedule_data = json.load(file)
     except Exception as e:
-        logger.error(f"Ошибка загрузки данных из {filename}: {e}")
-        return {}
+        logger.error(f"Ошибка при загрузке расписания: {e}")
+        raise
 
-def save_json(filename, data):
+# Чтение текста для начала и конца тренировки
+def load_texts():
     try:
-        with open(filename, 'w', encoding='utf-8') as file:
-            json.dump(data, file, ensure_ascii=False, indent=4)
+        with open('txt_start.txt', 'r') as file:
+            start_text = file.read().strip()
+        with open('txt_end.txt', 'r') as file:
+            end_text = file.read().strip()
+        return start_text, end_text
     except Exception as e:
-        logger.error(f"Ошибка сохранения данных в {filename}: {e}")
+        logger.error(f"Ошибка при загрузке текста: {e}")
+        raise
 
-# Пример структуры данных для schedule и penalties
-schedule = load_json('schedule.json') or {}
-penalties = load_json('penalties.json') or []
+start_text, end_text = load_texts()
 
-# Обработчик команды /start
-async def start(update: Update, context: CallbackContext):
-    """Отправляет приветственное сообщение и клавиатуру."""
-    keyboard = [
-        [KeyboardButton("Отправить начало тренировки")],
-        [KeyboardButton("Отправить конец тренировки")]
-    ]
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    await update.message.reply_text("Добро пожаловать! Выберите действие:", reply_markup=reply_markup)
+# Функция приветствия
+def start(update: Update, context: CallbackContext) -> None:
+    update.message.reply_text(
+        "Добро пожаловать в NOVA Assistant! Я буду помогать вам публиковать фотоотчеты ваших тренировок. Просто выберите нужную команду и отправьте одну фотографию начала или конца тренировки.",
+        reply_markup=None
+    )
+    context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text="Выберите команду:",
+        reply_markup=telegram.ReplyKeyboardMarkup([["Отправить начало тренировки", "Отправить конец тренировки"]], one_time_keyboard=True)
+    )
 
-# Обработчик для кнопок "Отправить начало тренировки" и "Отправить конец тренировки"
-async def set_photo_type(update: Update, context: CallbackContext):
+# Функция для получения и обработки фотографий
+def handle_photo(update: Update, context: CallbackContext) -> None:
+    # Получаем данные тренера
     user_id = update.message.from_user.id
-    if update.message.text == "Отправить начало тренировки":
-        context.user_data['photo_type'] = "start"
-        await update.message.reply_text("Теперь отправьте фото начала тренировки.")
+    chat_id = update.message.chat_id
+    photo = update.message.photo[-1].file_id
+
+    # Определяем, что это за фотография
+    if update.message.caption == "Отправить начало тренировки":
+        action = "start"
+    elif update.message.caption == "Отправить конец тренировки":
+        action = "end"
     else:
-        context.user_data['photo_type'] = "end"
-        await update.message.reply_text("Теперь отправьте фото конца тренировки.")
-
-# Обработчик для получения фотографий
-async def handle_photo(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-
-    if str(user_id) not in schedule:
-        await update.message.reply_text("Вы не зарегистрированы в системе.")
+        update.message.reply_text("Ошибка: неправильная команда.")
         return
 
-    if 'photo_type' not in context.user_data:
-        await update.message.reply_text("Сначала выберите, какое фото хотите отправить.")
+    # Проверяем время фотографии
+    if not is_within_time_window(action):
+        update.message.reply_text("Фото отправлено в неподобающий момент. Пожалуйста, попробуйте снова.")
         return
 
-    photo_type = context.user_data.pop('photo_type')  # Забираем и очищаем статус
+    # Получаем текст и отправляем фото
+    if action == "start":
+        text_to_send = start_text
+    elif action == "end":
+        text_to_send = end_text
 
-    now = datetime.now(TZ)
-    start_time = datetime.strptime(schedule[str(user_id)]["start"], "%H:%M").time()
-    end_time = datetime.strptime(schedule[str(user_id)]["end"], "%H:%M").time()
+    try:
+        # Публикуем фото
+        context.bot.send_photo(chat_id=photo_channel, photo=photo, caption=text_to_send)
+        update.message.reply_text("Фотография опубликована. Спасибо большое!")
+    except Exception as e:
+        logger.error(f"Ошибка при публикации фото: {e}")
+        update.message.reply_text("Ошибка при публикации фотографии. Пожалуйста, попробуйте снова.")
 
-    allowed_start = TZ.localize(datetime.combine(now.date(), start_time) - timedelta(minutes=10))
-    allowed_end = TZ.localize(datetime.combine(now.date(), end_time) + timedelta(minutes=10))
+# Проверка, что фото отправлено в допустимое время
+def is_within_time_window(action: str) -> bool:
+    now = datetime.now()
+    # Получаем информацию о тренировки
+    schedule_info = get_schedule_for_user(user_id)
+    training_start = schedule_info['start']
+    training_end = schedule_info['end']
 
-    if photo_type == "start" and allowed_start <= now <= TZ.localize(datetime.combine(now.date(), start_time) + timedelta(minutes=10)):
-        caption = "Фото начала тренировки."
-    elif photo_type == "end" and TZ.localize(datetime.combine(now.date(), end_time) - timedelta(minutes=10)) <= now <= allowed_end:
-        caption = "Фото конца тренировки."
-    else:
-        await update.message.reply_text("Фотография отправлена не вовремя. Разрешается отправка за 10 минут до и в течение 10 минут после начала или конца тренировки")
-        log_penalty(user_id)
-        return
+    # Проверяем, что фото отправлено в пределах 10 минут
+    if action == "start" and (now - training_start).seconds <= photo_time_window.seconds:
+        return True
+    if action == "end" and (now - training_end).seconds <= photo_time_window.seconds:
+        return True
+    return False
 
-    channel_id = schedule[str(user_id)]["channel"]
-    await update.message.reply_text(f"Фото отправлено в канал {channel_id}!")
+# Функция для работы с расписанием
+def get_schedule_for_user(user_id: int) -> dict:
+    # Здесь будет код для извлечения информации о расписании из schedule.json
+    # Для упрощения пока возвращаем фиктивные данные
+    return {"start": datetime(2025, 2, 23, 10, 0), "end": datetime(2025, 2, 23, 11, 0)}
 
-# Функция для записи штрафа
-def log_penalty(trainer_id):
-    penalties.append({"trainer_id": trainer_id, "date": datetime.now(TZ).isoformat()})
-    save_json('penalties.json', penalties)
-    logger.debug(f"Штраф для тренера {trainer_id} записан.")
+def main():
+    global bot, updater
+    # Инициализируем бота
+    bot = Bot(token='7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ')
+    updater = Updater(token='7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ', use_context=True)
+    dispatcher = updater.dispatcher
 
-# Запуск бота
-async def main():
-    """Запуск бота и планировщика."""
-    application = Application.builder().token(BOT_TOKEN).build()
+    # Загрузка данных
+    load_schedule()
 
-    # Обработчики команд
-    application.add_handler(CommandHandler("start", start))
-
-    # Обработчик для кнопок
-    application.add_handler(MessageHandler(filters.TEXT, set_photo_type))
-
-    # Обработчик для получения фото
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    # Обработчики
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(MessageHandler(Filters.photo, handle_photo))
 
     # Запуск бота
-    await application.run_polling()
+    updater.start_polling()
+    updater.idle()
 
-if __name__ == "__main__":
-    import asyncio
-
-    # Проверка, работает ли уже цикл событий, и запуск бота
-    if not asyncio.get_event_loop().is_running():
-        asyncio.run(main())  # Запускаем асинхронную функцию main()
+if __name__ == '__main__':
+    main()
