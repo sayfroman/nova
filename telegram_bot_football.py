@@ -39,13 +39,9 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 # Клавиатура с кнопками
-start_end_keyboard = ReplyKeyboardMarkup(
-    keyboard=[
-        [KeyboardButton("Отправить начало тренировки")],
-        [KeyboardButton("Отправить конец тренировки")]
-    ],
-    resize_keyboard=True
-)
+start_end_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+start_end_keyboard.add(KeyboardButton(text="Отправить начало тренировки"))
+start_end_keyboard.add(KeyboardButton(text="Отправить конец тренировки"))
 
 trainer_state = {}  # Словарь для отслеживания статуса отправки фото тренером
 
