@@ -132,6 +132,9 @@ schedule = [
     }
 ]
 
+# Словарь для отслеживания отправленных уведомлений
+notification_sent = {session["trainer_id"]: False for session in schedule}
+
 # Функция для получения текущего времени в Ташкенте
 def get_current_time():
     return datetime.now(pytz.timezone('Asia/Tashkent'))
@@ -148,16 +151,24 @@ async def send_notifications(context: CallbackContext):
         logging.info(f"Время начала тренировки: {start_time}")
         logging.info(f"Время уведомления: {notification_time}")
 
+        # Проверяем, что текущее время совпадает с временем уведомления
         if current_time.time() >= notification_time and current_time.time() < start_time:
             if current_time.strftime("%A") in session["days"]:
-                logging.info(f"Отправка уведомления тренеру {session['trainer_id']}")
-                try:
-                    await context.bot.send_message(
-                        chat_id=session["trainer_id"],
-                        text=f"Тренировка скоро начинается. Не забудьте опубликовать фотоотчет."
-                    )
-                except Exception as e:
-                    logging.error(f"Ошибка при отправке уведомления: {e}")
+                # Проверяем, не было ли уже отправлено уведомление
+                if not notification_sent[session["trainer_id"]]:
+                    logging.info(f"Отправка уведомления тренеру {session['trainer_id']}")
+                    try:
+                        await context.bot.send_message(
+                            chat_id=session["trainer_id"],
+                            text=f"Тренировка скоро начинается. Не забудьте опубликовать фотоотчет."
+                        )
+                        # Помечаем уведомление как отправленное
+                        notification_sent[session["trainer_id"]] = True
+                    except Exception as e:
+                        logging.error(f"Ошибка при отправке уведомления: {e}")
+        else:
+            # Сбрасываем флаг, если время уведомления прошло
+            notification_sent[session["trainer_id"]] = False
 
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
