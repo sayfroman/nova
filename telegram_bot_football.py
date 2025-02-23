@@ -74,16 +74,33 @@ def get_schedule():
         logger.error(f"Ошибка при получении расписания из базы данных MongoDB: {e}")
         return {}
 
-# Функция для получения случайного текста из файла
-def get_random_text(file_path):
-    """Возвращает случайный текст из указанного TXT-файла."""
+# Функция для загрузки данных в MongoDB
+def load_schedule():
+    """Загружает расписание в MongoDB."""
     try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            texts = file.readlines()
-        return random.choice(texts).strip()
+        db = get_db_connection()
+        if db is None:
+            return
+        
+        schedule_collection = db.schedule
+        data = [
+            {"trainer_id": "5212834409", "trainer_name": "Шохрух", "start_time": "17:00", "end_time": "18:00", "channel_id": "-1002331628469", "days_of_week": "Monday, Wednesday, Friday", "branch": "Школа №295"},
+            {"trainer_id": "413625395", "trainer_name": "Алексей", "start_time": "17:00", "end_time": "18:00", "channel_id": "-1002432571124", "days_of_week": "Monday, Wednesday, Friday", "branch": "Школа №101"},
+            {"trainer_id": "735570267", "trainer_name": "Марко", "start_time": "14:00", "end_time": "15:00", "channel_id": "-1002323472696", "days_of_week": "Monday, Wednesday, Friday", "branch": "Школа №307"},
+            {"trainer_id": "735570267", "trainer_name": "Марко", "start_time": "17:00", "end_time": "18:00", "channel_id": "-1002323472696", "days_of_week": "Monday, Wednesday, Friday", "branch": "Школа №307"},
+            {"trainer_id": "1532520919", "trainer_name": "Сардор", "start_time": "15:00", "end_time": "16:00", "channel_id": "-1002231891578", "days_of_week": "Monday, Wednesday, Friday", "branch": "Школа №328"},
+            {"trainer_id": "606134505", "trainer_name": "Миржалол", "start_time": "17:30", "end_time": "18:30", "channel_id": "-1002413556142", "days_of_week": "Tuesday, Thursday, Saturday", "branch": "Школа №186"},
+            {"trainer_id": "735570267", "trainer_name": "Марко", "start_time": "17:00", "end_time": "18:00", "channel_id": "-1002246173492", "days_of_week": "Tuesday, Thursday, Saturday", "branch": "Школа №178"},
+            {"trainer_id": "413625395", "trainer_name": "Алексей", "start_time": "15:00", "end_time": "16:00", "channel_id": "-1002460005367", "days_of_week": "Monday, Wednesday, Friday", "branch": "Школа №254"},
+            {"trainer_id": "6969603804", "trainer_name": "Бунед", "start_time": "15:00", "end_time": "16:00", "channel_id": "-1002344879265", "days_of_week": "Monday, Wednesday, Friday", "branch": "Школа №117"},
+            {"trainer_id": "7666290317", "trainer_name": "Адиба", "start_time": "14:00", "end_time": "15:00", "channel_id": "-1002309219325", "days_of_week": "Monday, Wednesday, Sunday", "branch": "Школа №233"},
+            {"trainer_id": "6969603804", "trainer_name": "Бунед", "start_time": "17:30", "end_time": "18:30", "channel_id": "-1002214695720", "days_of_week": "Tuesday, Thursday, Saturday", "branch": "Школа №44"}
+        ]
+        
+        schedule_collection.insert_many(data)
+        logger.debug("Данные расписания успешно загружены в базу данных MongoDB.")
     except Exception as e:
-        logger.error(f"Ошибка при чтении файла {file_path}: {e}")
-        return "Ошибка при загрузке текста."
+        logger.error(f"Ошибка при загрузке расписания в базу данных MongoDB: {e}")
 
 # Логирование штрафа в базу данных
 def log_penalty(trainer_id):
@@ -189,17 +206,20 @@ async def check_missed_reports():
                 logger.error(f"Ошибка при отправке уведомления: {e}")
 
 # Создаем планировщик
-scheduler = AsyncIOScheduler()
+scheduler = AsyncIOScheduler(timezone=TZ)
 
-# Добавляем задачи в планировщик
-scheduler.add_job(send_reminder, 'interval', minutes=1)  # Проверка каждую минуту
-scheduler.add_job(check_missed_reports, 'interval', minutes=5)  # Проверка пропущенных отчетов каждую 5 минуту
+# Запускаем задачи
+scheduler.add_job(send_reminder, "interval", minutes=1)
+scheduler.add_job(check_missed_reports, "interval", minutes=1)
+scheduler.start()
 
-# Запуск планировщика и бота
-async def on_start():
-    scheduler.start()  # Запуск планировщика
-    await dp.start_polling(skip_updates=True)  # Запуск бота без использования asyncio.run()
+# Запускаем бота
+async def main():
+    try:
+        load_schedule()
+        await dp.start_polling()
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {e}")
 
-# Запуск планировщика и бота
 if __name__ == "__main__":
-    asyncio.run(on_start())  # Используем asyncio.run() для запуска задачи
+    asyncio.run(main())
