@@ -1,7 +1,7 @@
 import random
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, JobQueue
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 import pytz
 
 # Создаем объект для часового пояса Ташкента
@@ -102,20 +102,15 @@ async def schedule_notifications(update: Update, context):
             start_time = TASHKENT_TZ.localize(start_time)
             notify_time = start_time - timedelta(minutes=10)
             
-            # Запускаем задачу уведомления за 10 минут
             context.job_queue.run_once(notify_before_training, notify_time, context={'trainer_id': entry['trainer_id']})
 
 async def main():
     # Настройка бота
-    application = Application.builder().token("YOUR_BOT_TOKEN").build()
-    job_queue = application.job_queue
+    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
     
     # Добавляем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button))
-    
-    # Расписание уведомлений
-    application.add_handler(MessageHandler(filters.TEXT, schedule_notifications))
     
     # Запуск бота
     await application.run_polling()
