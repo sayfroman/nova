@@ -36,7 +36,7 @@ TXT_END = "txt_end.txt"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 # Клавиатура с кнопками
 start_end_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
