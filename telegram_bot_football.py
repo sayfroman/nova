@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timedelta
 from telegram import Update, Bot
 from telegram.constants import ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackContext
 import os
 os.chmod('telegram_bot_football.py', 0o755)
 
