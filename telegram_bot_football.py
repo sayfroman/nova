@@ -31,7 +31,7 @@ if not MONGO_URI or not BOT_TOKEN:
 
 # Создание бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 # Обработчик команды /start
 async def send_welcome(message: types.Message):
@@ -43,7 +43,7 @@ dp.message.register(send_welcome, commands=["start"])
 # Запуск бота
 if __name__ == '__main__':
     from aiogram.utils import executor
-    executor.start_polling(dp, skip_updates=True)
+    executor.start_polling(dp, bot=bot, skip_updates=True)
 
 # Подключение к базе данных MongoDB
 def get_db_connection():
