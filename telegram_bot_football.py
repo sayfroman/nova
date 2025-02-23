@@ -1,34 +1,35 @@
 import os
 import random
 import pytz
-import psycopg2
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
+from pymongo import MongoClient
 
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # Проверка переменных окружения
-DATABASE_URL = os.getenv("DATABASE_URL")
+MONGO_URI = os.getenv("MONGO_URI")  # URL подключения к MongoDB
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not DATABASE_URL or not BOT_TOKEN:
+if not MONGO_URI or not BOT_TOKEN:
     logger.error("Не найдены обязательные переменные окружения!")
     exit(1)
 
-# Подключение к базе данных
+# Подключение к базе данных MongoDB
 def get_db_connection():
-    """Создает и возвращает подключение к базе данных."""
+    """Создает и возвращает подключение к базе данных MongoDB."""
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        logger.debug("Подключение к базе данных успешно.")
-        return conn
+        client = MongoClient(MONGO_URI)
+        db = client.get_database()  # Получаем базу данных
+        logger.debug("Подключение к базе данных MongoDB успешно.")
+        return db
     except Exception as e:
-        logger.error(f"Ошибка подключения к базе данных: {e}")
+        logger.error(f"Ошибка подключения к базе данных MongoDB: {e}")
         return None
 
 # Часовой пояс
@@ -58,21 +59,19 @@ trainer_state = {}  # Словарь для отслеживания стату�
 
 # Функция для получения расписания из базы данных
 def get_schedule():
-    """Получает расписание из базы данных."""
+    """Получает расписание из базы данных MongoDB."""
     try:
-        conn = get_db_connection()
-        if conn is None:
+        db = get_db_connection()
+        if db is None:
             return {}
         
-        cursor = conn.cursor()
-        cursor.execute("SELECT trainer_id, channel_id, start_time, end_time FROM \"NOVA-TABLE\"")
-        data = cursor.fetchall()
-        conn.close()
+        schedule_collection = db.schedule  # Получаем коллекцию расписаний
+        schedule_data = schedule_collection.find()  # Получаем все записи
         
-        logger.debug("Расписание успешно получено из базы данных.")
-        return {row[0]: {"channel": row[1], "start": row[2], "end": row[3]} for row in data}
+        logger.debug("Расписание успешно получено из базы данных MongoDB.")
+        return {str(row["_id"]): {"channel": row["channel_id"], "start": row["start_time"], "end": row["end_time"]} for row in schedule_data}
     except Exception as e:
-        logger.error(f"Ошибка при получении расписания из базы данных: {e}")
+        logger.error(f"Ошибка при получении расписания из базы данных MongoDB: {e}")
         return {}
 
 # Функция для получения случайного текста из файла
@@ -88,18 +87,16 @@ def get_random_text(file_path):
 
 # Логирование штрафа в базу данных
 def log_penalty(trainer_id):
-    """Записывает штраф в базу данных."""
+    """Записывает штраф в базу данных MongoDB."""
     try:
-        conn = get_db_connection()
-        if conn is None:
+        db = get_db_connection()
+        if db is None:
             return
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO STRAFS (trainer_id, date) VALUES (%s, %s)", (trainer_id, datetime.now(TZ)))
-        conn.commit()
-        conn.close()
-        logger.debug(f"Штраф для тренера {trainer_id} записан в базу данных.")
+        penalties_collection = db.penalties  # Получаем коллекцию штрафов
+        penalties_collection.insert_one({"trainer_id": trainer_id, "date": datetime.now(TZ)})
+        logger.debug(f"Штраф для тренера {trainer_id} записан в базу данных MongoDB.")
     except Exception as e:
-        logger.error(f"Ошибка при записи штрафа в базу данных: {e}")
+        logger.error(f"Ошибка при записи штрафа в базу данных MongoDB: {e}")
 
 # Обработчик команды "/start"
 async def send_welcome(message: types.Message):
