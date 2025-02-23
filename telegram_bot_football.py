@@ -140,9 +140,18 @@ async def main():
     application.job_queue.run_repeating(send_reminder, interval=60, first=0)
 
     # Запуск бота
-    await application.run_polling()
+    try:
+        await application.run_polling()
+    except RuntimeError:
+        # Если цикл событий уже работает, просто пропускаем
+        pass
 
 if __name__ == "__main__":
     import asyncio
-    # Используем текущий цикл событий
-    asyncio.get_event_loop().run_until_complete(main())  # Запускаем асинхронную функцию main()
+
+    # Проверка, работает ли уже цикл событий, и запуск бота
+    if not asyncio.get_event_loop().is_running():
+        asyncio.run(main())  # Запускаем асинхронную функцию main()
+    else:
+        # Если цикл событий уже работает (например, в Jupyter), запускаем бота без попытки создать новый цикл
+        asyncio.ensure_future(main())
