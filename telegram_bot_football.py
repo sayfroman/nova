@@ -1,22 +1,19 @@
 import logging
 import json
 from datetime import datetime, timedelta
-from telegram import Update, Bot
-from telegram.constants import ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram import Update, Bot, ReplyKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 import os
-os.chmod('telegram_bot_football.py', 0o755)
 
 # Установим логирование для ошибок
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 # Глобальные переменные
 bot = None
-updater = None
 schedule_data = {}
 photo_time_window = timedelta(minutes=10)
+photo_channel = '@your_channel'  # Укажите канал, в который будете отправлять фото
 
 # Загрузка расписания тренеров
 def load_schedule():
@@ -43,19 +40,19 @@ def load_texts():
 start_text, end_text = load_texts()
 
 # Функция приветствия
-def start(update: Update, context: CallbackContext) -> None:
-    update.message.reply_text(
+async def start(update: Update, context: CallbackContext) -> None:
+    await update.message.reply_text(
         "Добро пожаловать в NOVA Assistant! Я буду помогать вам публиковать фотоотчеты ваших тренировок. Просто выберите нужную команду и отправьте одну фотографию начала или конца тренировки.",
         reply_markup=None
     )
-    context.bot.send_message(
+    await context.bot.send_message(
         chat_id=update.effective_chat.id,
         text="Выберите команду:",
-        reply_markup=telegram.ReplyKeyboardMarkup([["Отправить начало тренировки", "Отправить конец тренировки"]], one_time_keyboard=True)
+        reply_markup=ReplyKeyboardMarkup([["Отправить начало тренировки", "Отправить конец тренировки"]], one_time_keyboard=True)
     )
 
 # Функция для получения и обработки фотографий
-def handle_photo(update: Update, context: CallbackContext) -> None:
+async def handle_photo(update: Update, context: CallbackContext) -> None:
     # Получаем данные тренера
     user_id = update.message.from_user.id
     chat_id = update.message.chat_id
@@ -67,12 +64,12 @@ def handle_photo(update: Update, context: CallbackContext) -> None:
     elif update.message.caption == "Отправить конец тренировки":
         action = "end"
     else:
-        update.message.reply_text("Ошибка: неправильная команда.")
+        await update.message.reply_text("Ошибка: неправильная команда.")
         return
 
     # Проверяем время фотографии
     if not is_within_time_window(action):
-        update.message.reply_text("Фото отправлено в неподобающий момент. Пожалуйста, попробуйте снова.")
+        await update.message.reply_text("Фото отправлено в неподобающий момент. Пожалуйста, попробуйте снова.")
         return
 
     # Получаем текст и отправляем фото
@@ -83,11 +80,11 @@ def handle_photo(update: Update, context: CallbackContext) -> None:
 
     try:
         # Публикуем фото
-        context.bot.send_photo(chat_id=photo_channel, photo=photo, caption=text_to_send)
-        update.message.reply_text("Фотография опубликована. Спасибо большое!")
+        await context.bot.send_photo(chat_id=photo_channel, photo=photo, caption=text_to_send)
+        await update.message.reply_text("Фотография опубликована. Спасибо большое!")
     except Exception as e:
         logger.error(f"Ошибка при публикации фото: {e}")
-        update.message.reply_text("Ошибка при публикации фотографии. Пожалуйста, попробуйте снова.")
+        await update.message.reply_text("Ошибка при публикации фотографии. Пожалуйста, попробуйте снова.")
 
 # Проверка, что фото отправлено в допустимое время
 def is_within_time_window(action: str) -> bool:
@@ -110,23 +107,20 @@ def get_schedule_for_user(user_id: int) -> dict:
     # Для упрощения пока возвращаем фиктивные данные
     return {"start": datetime(2025, 2, 23, 10, 0), "end": datetime(2025, 2, 23, 11, 0)}
 
-def main():
-    global bot, updater
-    # Инициализируем бота
-    bot = Bot(token='7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ')
-    updater = Updater(token='7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ', use_context=True)
-    dispatcher = updater.dispatcher
+# Основная функция для запуска бота
+async def main():
+    application = Application.builder().token("YOUR_BOT_TOKEN").build()
 
     # Загрузка данных
     load_schedule()
 
     # Обработчики
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(Filters.photo, handle_photo))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     # Запуск бота
-    updater.start_polling()
-    updater.idle()
+    await application.run_polling()
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())
