@@ -1,6 +1,6 @@
 import os
 import logging
-from telegram import Update, Bot, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 from datetime import datetime, timedelta
 import pytz
@@ -41,9 +41,6 @@ def save_json(filename, data):
 # Пример структуры данных для schedule и penalties
 schedule = load_json('schedule.json') or {}
 penalties = load_json('penalties.json') or []
-
-# Создание бота
-bot = Bot(token=BOT_TOKEN)
 
 # Обработчик команды /start
 async def start(update: Update, context: CallbackContext):
@@ -96,31 +93,13 @@ async def handle_photo(update: Update, context: CallbackContext):
         return
 
     channel_id = schedule[str(user_id)]["channel"]
-    await bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=caption)
-    await update.message.reply_text("Фото успешно отправлено!")
+    await update.message.reply_text(f"Фото отправлено в канал {channel_id}!")
 
 # Функция для записи штрафа
 def log_penalty(trainer_id):
     penalties.append({"trainer_id": trainer_id, "date": datetime.now(TZ).isoformat()})
     save_json('penalties.json', penalties)
     logger.debug(f"Штраф для тренера {trainer_id} записан.")
-
-# Функция для отправки напоминания за 10 минут до начала тренировки
-async def send_reminder(context: CallbackContext):
-    now = datetime.now(TZ)
-
-    for user_id, data in schedule.items():
-        start_time = datetime.strptime(data["start"], "%H:%M").time()
-        reminder_time = TZ.localize(datetime.combine(now.date(), start_time) - timedelta(minutes=10))
-
-        if now >= reminder_time and now < reminder_time + timedelta(minutes=1):
-            try:
-                await bot.send_message(
-                    user_id,
-                    "Скоро у вас начинается тренировка. Не забудьте отправить фото нажав на кнопку 'Отправить начало тренировки'."
-                )
-            except Exception as e:
-                logger.error(f"Ошибка при отправке напоминания тренеру {user_id}: {e}")
 
 # Запуск бота
 async def main():
@@ -136,17 +115,8 @@ async def main():
     # Обработчик для получения фото
     application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    # Запуск напоминаний
-    application.job_queue.run_repeating(send_reminder, interval=60, first=0)
-
     # Запуск бота
-    try:
-        await application.run_polling()
-    except RuntimeError:
-        # Если цикл событий уже работает, просто пропускаем
-        pass
-    finally:
-        await application.shutdown()
+    await application.run_polling()
 
 if __name__ == "__main__":
     import asyncio
@@ -154,6 +124,3 @@ if __name__ == "__main__":
     # Проверка, работает ли уже цикл событий, и запуск бота
     if not asyncio.get_event_loop().is_running():
         asyncio.run(main())  # Запускаем асинхронную функцию main()
-    else:
-        # Если цикл событий уже работает (например, в Jupyter), запускаем бота без попытки создать новый цикл
-        asyncio.ensure_future(main())
