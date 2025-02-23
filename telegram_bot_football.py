@@ -7,21 +7,28 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import logging
+
+# Настройка логирования
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Проверка переменных окружения
 DATABASE_URL = os.getenv("DATABASE_URL")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not DATABASE_URL or not BOT_TOKEN:
-    print("Не найдены обязательные переменные окружения!")
+    logger.error("Не найдены обязательные переменные окружения!")
     exit(1)
 
 # Подключение к базе данных
 def get_db_connection():
     """Создает и возвращает подключение к базе данных."""
     try:
-        return psycopg2.connect(DATABASE_URL)
+        conn = psycopg2.connect(DATABASE_URL)
+        logger.debug("Подключение к базе данных успешно.")
+        return conn
     except Exception as e:
-        print(f"Ошибка подключения к базе данных: {e}")
+        logger.error(f"Ошибка подключения к базе данных: {e}")
         return None
 
 # Часовой пояс
@@ -36,7 +43,10 @@ TXT_END = "txt_end.txt"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot)  # Инициализация Dispatcher с передачей Bot
+dp = Dispatcher()  # Инициализация Dispatcher без передачи Bot
+
+# Привязка бота к диспетчеру
+dp.bind_bot(bot)
 
 # Клавиатура с кнопками
 start_end_keyboard = ReplyKeyboardMarkup(
@@ -62,9 +72,10 @@ def get_schedule():
         data = cursor.fetchall()
         conn.close()
         
+        logger.debug("Расписание успешно получено из базы данных.")
         return {row[0]: {"channel": row[1], "start": row[2], "end": row[3]} for row in data}
     except Exception as e:
-        print(f"Ошибка при получении расписания из базы данных: {e}")
+        logger.error(f"Ошибка при получении расписания из базы данных: {e}")
         return {}
 
 # Функция для получения случайного текста из файла
@@ -75,7 +86,7 @@ def get_random_text(file_path):
             texts = file.readlines()
         return random.choice(texts).strip()
     except Exception as e:
-        print(f"Ошибка при чтении файла {file_path}: {e}")
+        logger.error(f"Ошибка при чтении файла {file_path}: {e}")
         return "Ошибка при загрузке текста."
 
 # Логирование штрафа в базу данных
@@ -89,8 +100,9 @@ def log_penalty(trainer_id):
         cursor.execute("INSERT INTO STRAFS (trainer_id, date) VALUES (%s, %s)", (trainer_id, datetime.now(TZ)))
         conn.commit()
         conn.close()
+        logger.debug(f"Штраф для тренера {trainer_id} записан в базу данных.")
     except Exception as e:
-        print(f"Ошибка при записи штрафа в базу данных: {e}")
+        logger.error(f"Ошибка при записи штрафа в базу данных: {e}")
 
 # Обработчик команды "/start"
 async def send_welcome(message: types.Message):
@@ -164,7 +176,7 @@ async def send_reminder():
                     "Скоро у вас начинается тренировка. Не забудьте отправить фото нажав на кнопку 'Отправить начало тренировки'."
                 )
             except Exception as e:
-                print(f"Ошибка при отправке напоминания тренеру {user_id}: {e}")
+                logger.error(f"Ошибка при отправке напоминания тренеру {user_id}: {e}")
 
 # Функция для проверки пропущенных отчетов
 async def check_missed_reports():
@@ -180,7 +192,7 @@ async def check_missed_reports():
                 await bot.send_message(CHAT_ID, f"<b>{user_id}</b>, вы не отправили фотоотчет вовремя!", parse_mode="HTML")
                 log_penalty(user_id)
             except Exception as e:
-                print(f"Ошибка при отправке уведомления: {e}")
+                logger.error(f"Ошибка при отправке уведомления: {e}")
 
 # Создаем планировщик
 scheduler = AsyncIOScheduler()
