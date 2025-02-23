@@ -1,4 +1,3 @@
-import os
 import random
 import pytz
 from datetime import datetime, timedelta
@@ -8,7 +7,16 @@ import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import logging
 from pymongo import MongoClient
+from dotenv import load_dotenv
 
+load_dotenv()  # Загружает переменные из .env файла
+MONGO_URI = os.getenv("MONGO_URI")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not MONGO_URI or not BOT_TOKEN:
+    print("Ошибка: Не найдены обязательные переменные окружения!")
+    exit(1)
+    
 # Настройка логирования
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
