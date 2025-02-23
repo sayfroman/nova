@@ -41,6 +41,7 @@ start_text, end_text = load_texts()
 
 # Функция приветствия
 async def start(update: Update, context: CallbackContext) -> None:
+    logger.info(f"Команда /start получена от {update.message.from_user.id}")
     await update.message.reply_text(
         "Добро пожаловать в NOVA Assistant! Я буду помогать вам публиковать фотоотчеты ваших тренировок. Просто выберите нужную команду и отправьте одну фотографию начала или конца тренировки.",
         reply_markup=None
@@ -53,6 +54,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 
 # Функция для получения и обработки фотографий
 async def handle_photo(update: Update, context: CallbackContext) -> None:
+    logger.info(f"Фото получено от {update.message.from_user.id}")
     # Получаем данные тренера
     user_id = update.message.from_user.id
     chat_id = update.message.chat_id
@@ -109,6 +111,7 @@ def get_schedule_for_user(user_id: int) -> dict:
 
 # Основная функция для запуска бота
 async def main():
+    logger.info("Запуск бота...")
     application = Application.builder().token("YOUR_BOT_TOKEN").build()
 
     # Загрузка данных
