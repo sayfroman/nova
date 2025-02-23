@@ -139,15 +139,25 @@ def get_current_time():
 # Функция для отправки уведомлений за 10 минут до начала тренировки
 async def send_notifications(context: CallbackContext):
     current_time = get_current_time()
+    logging.info(f"Текущее время: {current_time}")
+
     for session in schedule:
         start_time = datetime.strptime(session["start"], "%H:%M").time()
         notification_time = (datetime.combine(current_time.date(), start_time) - timedelta(minutes=10)).time()
+        
+        logging.info(f"Время начала тренировки: {start_time}")
+        logging.info(f"Время уведомления: {notification_time}")
+
         if current_time.time() >= notification_time and current_time.time() < start_time:
             if current_time.strftime("%A") in session["days"]:
-                await context.bot.send_message(
-                    chat_id=session["trainer_id"],
-                    text=f"Тренировка скоро начинается. Не забудьте опубликовать фотоотчет."
-                )
+                logging.info(f"Отправка уведомления тренеру {session['trainer_id']}")
+                try:
+                    await context.bot.send_message(
+                        chat_id=session["trainer_id"],
+                        text=f"Тренировка скоро начинается. Не забудьте опубликовать фотоотчет."
+                    )
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке уведомления: {e}")
 
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -185,39 +195,38 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             end_photo_start = (datetime.combine(current_time.date(), end_time) - timedelta(minutes=10)).time()
             end_photo_end = (datetime.combine(current_time.date(), end_time) + timedelta(minutes=15)).time()
 
-            if update.message.text == "отправить начало тренировки":
-                if current_time.time() >= start_photo_start and current_time.time() <= start_photo_end:
-                    try:
-                        caption = random.choice(start_texts)
-                        logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
-                        await context.bot.send_photo(
-                            chat_id=session["channel_id"],
-                            photo=update.message.photo[-1].file_id,
-                            caption=caption
-                        )
-                        await update.message.reply_text("Фото успешно опубликовано!")
-                    except Exception as e:
-                        logging.error(f"Ошибка при отправке фото: {e}")
-                        await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
-                else:
-                    await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
+            logging.info(f"Время начала тренировки: {start_time}, Время окончания: {end_time}")
+            logging.info(f"Диапазон для фото начала: {start_photo_start} - {start_photo_end}")
+            logging.info(f"Диапазон для фото окончания: {end_photo_start} - {end_photo_end}")
 
-            elif update.message.text == "отправить конец тренировки":
-                if current_time.time() >= end_photo_start and current_time.time() <= end_photo_end:
-                    try:
-                        caption = random.choice(end_texts)
-                        logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
-                        await context.bot.send_photo(
-                            chat_id=session["channel_id"],
-                            photo=update.message.photo[-1].file_id,
-                            caption=caption
-                        )
-                        await update.message.reply_text("Фото успешно опубликовано!")
-                    except Exception as e:
-                        logging.error(f"Ошибка при отправке фото: {e}")
-                        await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
-                else:
-                    await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
+            if current_time.time() >= start_photo_start and current_time.time() <= start_photo_end:
+                try:
+                    caption = random.choice(start_texts)
+                    logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
+                    await context.bot.send_photo(
+                        chat_id=session["channel_id"],
+                        photo=update.message.photo[-1].file_id,
+                        caption=caption
+                    )
+                    await update.message.reply_text("Фото успешно опубликовано!")
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке фото: {e}")
+                    await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
+            elif current_time.time() >= end_photo_start and current_time.time() <= end_photo_end:
+                try:
+                    caption = random.choice(end_texts)
+                    logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
+                    await context.bot.send_photo(
+                        chat_id=session["channel_id"],
+                        photo=update.message.photo[-1].file_id,
+                        caption=caption
+                    )
+                    await update.message.reply_text("Фото успешно опубликовано!")
+                except Exception as e:
+                    logging.error(f"Ошибка при отправке фото: {e}")
+                    await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
+            else:
+                await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
             return
     await update.message.reply_text("Вы не зарегистрированы в системе.")
 
@@ -234,12 +243,16 @@ def main():
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button))
-    application.add_handler(MessageHandler(filters.PHOTO & filters.TEXT, handle_photo))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))  # Измененный фильтр
 
     # Настройка вебхука
     webhook_url = os.getenv("WEBHOOK_URL")  # URL вашего бота на Railway
     if not webhook_url:
         raise ValueError("WEBHOOK_URL не найден в переменных окружения!")
+
+    # Запуск планировщика для уведомлений
+    job_queue = application.job_queue
+    job_queue.run_repeating(send_notifications, interval=60.0, first=0.0)  # Проверка каждую минуту
 
     application.run_webhook(
         listen="0.0.0.0",
