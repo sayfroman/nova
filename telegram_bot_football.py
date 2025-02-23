@@ -10,8 +10,8 @@ import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # Проверка переменных окружения
-DATABASE_URL = os.getenv("DATABASE_URL")
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+DATABASE_URL = os.getenv("${{ Postgres.DATABASE_URL }}")
+BOT_TOKEN = os.getenv("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ")
 if not DATABASE_URL or not BOT_TOKEN:
     print("Не найдены обязательные переменные окружения!")
     exit(1)
@@ -191,5 +191,6 @@ async def on_start():
 # Запуск планировщика и бота
 if __name__ == "__main__":
     # Просто вызываем асинхронную функцию без явного создания нового цикла событий
-    asyncio.get_event_loop().create_task(on_start())  # Запускаем задачу без использования asyncio.run()
-    asyncio.get_event_loop().run_forever()  # Поддерживаем цикл событий активным
+ if __name__ == "__main__":
+    asyncio.run(on_start())
+
