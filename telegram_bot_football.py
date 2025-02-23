@@ -186,9 +186,10 @@ scheduler.add_job(check_missed_reports, 'interval', minutes=5)  # Проверк
 # Запуск планировщика и бота
 async def on_start():
     scheduler.start()  # Запуск планировщика
-    await executor.start_polling(dp, skip_updates=True)  # Запуск бота
+    await dp.start_polling(skip_updates=True)  # Запуск бота без использования asyncio.run()
 
 # Запуск планировщика и бота
 if __name__ == "__main__":
     # Просто вызываем асинхронную функцию без явного создания нового цикла событий
-    asyncio.run(on_start())  # Вместо get_event_loop().run_until_complete
+    asyncio.get_event_loop().create_task(on_start())  # Запускаем задачу без использования asyncio.run()
+    asyncio.get_event_loop().run_forever()  # Поддерживаем цикл событий активным
