@@ -190,5 +190,5 @@ async def on_start():
 
 # Запуск планировщика и бота
 if __name__ == "__main__":
-    # Запускаем цикл событий напрямую
-    asyncio.get_event_loop().run_until_complete(on_start())
+    # Просто вызываем асинхронную функцию без явного создания нового цикла событий
+    asyncio.run(on_start())  # Вместо get_event_loop().run_until_complete
