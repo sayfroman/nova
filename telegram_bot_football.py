@@ -1,121 +1,219 @@
+import os
+import logging
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import random
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 import pytz
-import asyncio
 
-# Создаем объект для часового пояса Ташкента
-TASHKENT_TZ = pytz.timezone('Asia/Tashkent')
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
 
-# Расписание тренеров
+# Тексты для начала и конца тренировки
+start_texts = [
+    "Тренировка началась! Удачи на поле! ⚽",
+    "Время тренировки! Покажите свой лучший результат! 💪",
+    "На старт, внимание, марш! 🏃‍♂️",
+    "Тренировка стартовала! Пусть сегодня будет продуктивно! 🌟",
+    "Поехали! Тренировка началась! 🚀"
+]
+
+end_texts = [
+    "Тренировка завершена! Отличная работа! 👏",
+    "Сегодня вы сделали большой шаг вперед! 🎉",
+    "Тренировка окончена. Отдыхайте и восстанавливайтесь! 🌿",
+    "Молодцы! Сегодня вы хорошо потрудились! 💯",
+    "Тренировка завершена. До встречи на следующей! 👋"
+]
+
+# Расписание тренировок
 schedule = [
-    {"trainer_id": "6969603804", "name": "Бунед", "start": "17:00", "end": "18:00", "channel_id": "-1002331628469", "days": "Monday, Wednesday, Friday", "school": "Школа №295"},
-    {"trainer_id": "413625395", "name": "Алексей", "start": "17:00", "end": "18:00", "channel_id": "-1002432571124", "days": "Monday, Wednesday, Friday", "school": "Школа №101"},
-    {"trainer_id": "735570267", "name": "Марко", "start": "14:00", "end": "15:00", "channel_id": "-1002323472696", "days": "Monday, Wednesday, Friday", "school": "Школа №307"},
-    {"trainer_id": "735570267", "name": "Марко", "start": "17:00", "end": "18:00", "channel_id": "-1002323472696", "days": "Monday, Wednesday, Friday", "school": "Школа №307"},
-    {"trainer_id": "1532520919", "name": "Сардор", "start": "15:00", "end": "16:00", "channel_id": "-1002231891578", "days": "Monday, Wednesday, Friday", "school": "Школа №328"},
-    {"trainer_id": "606134505", "name": "Миржалол", "start": "17:30", "end": "18:30", "channel_id": "-1002413556142", "days": "Tuesday, Thursday, Saturday", "school": "Школа №186"},
-    {"trainer_id": "735570267", "name": "Марко", "start": "17:00", "end": "18:00", "channel_id": "-1002246173492", "days": "Tuesday, Thursday, Saturday", "school": "Школа №178"},
-    {"trainer_id": "413625395", "name": "Алексей", "start": "15:00", "end": "16:00", "channel_id": "-1002460005367", "days": "Monday, Wednesday, Friday", "school": "Школа №254"},
-    {"trainer_id": "6969603804", "name": "Бунед", "start": "15:00", "end": "16:00", "channel_id": "-1002344879265", "days": "Monday, Wednesday, Friday", "school": "Школа №117"},
-    {"trainer_id": "7666290317", "name": "Адиба", "start": "14:00", "end": "15:00", "channel_id": "-1002309219325", "days": "Monday, Wednesday, Sunday", "school": "Школа №233"},
-    {"trainer_id": "6969603804", "name": "Бунед", "start": "17:30", "end": "18:30", "channel_id": "-1002214695720", "days": "Tuesday, Thursday, Saturday", "school": "Школа №44"}
+    {
+        "trainer_id": "6969603804",
+        "name": "Бунед",
+        "start": "17:00",
+        "end": "18:00",
+        "channel_id": "-1002331628469",
+        "days": "Monday, Wednesday, Friday",
+        "school": "Школа №295"
+    },
+    {
+        "trainer_id": "413625395",
+        "name": "Алексей",
+        "start": "17:00",
+        "end": "18:00",
+        "channel_id": "-1002432571124",
+        "days": "Monday, Wednesday, Friday",
+        "school": "Школа №101"
+    },
+    {
+        "trainer_id": "735570267",
+        "name": "Марко",
+        "start": "14:00",
+        "end": "15:00",
+        "channel_id": "-1002323472696",
+        "days": "Monday, Wednesday, Friday",
+        "school": "Школа №307"
+    },
+    {
+        "trainer_id": "735570267",
+        "name": "Марко",
+        "start": "17:00",
+        "end": "18:00",
+        "channel_id": "-1002323472696",
+        "days": "Monday, Wednesday, Friday",
+        "school": "Школа №307"
+    },
+    {
+        "trainer_id": "1532520919",
+        "name": "Сардор",
+        "start": "15:00",
+        "end": "16:00",
+        "channel_id": "-1002231891578",
+        "days": "Monday, Wednesday, Friday",
+        "school": "Школа №328"
+    },
+    {
+        "trainer_id": "606134505",
+        "name": "Миржалол",
+        "start": "17:30",
+        "end": "18:30",
+        "channel_id": "-1002413556142",
+        "days": "Tuesday, Thursday, Saturday",
+        "school": "Школа №186"
+    },
+    {
+        "trainer_id": "735570267",
+        "name": "Марко",
+        "start": "17:00",
+        "end": "18:00",
+        "channel_id": "-1002246173492",
+        "days": "Tuesday, Thursday, Saturday",
+        "school": "Школа №178"
+    },
+    {
+        "trainer_id": "413625395",
+        "name": "Алексей",
+        "start": "15:00",
+        "end": "16:00",
+        "channel_id": "-1002460005367",
+        "days": "Monday, Wednesday, Friday",
+        "school": "Школа №254"
+    },
+    {
+        "trainer_id": "6969603804",
+        "name": "Бунед",
+        "start": "15:00",
+        "end": "16:00",
+        "channel_id": "-1002344879265",
+        "days": "Monday, Wednesday, Friday",
+        "school": "Школа №117"
+    },
+    {
+        "trainer_id": "7666290317",
+        "name": "Адиба",
+        "start": "14:00",
+        "end": "15:00",
+        "channel_id": "-1002309219325",
+        "days": "Monday, Wednesday, Sunday",
+        "school": "Школа №233"
+    },
+    {
+        "trainer_id": "6969603804",
+        "name": "Бунед",
+        "start": "17:30",
+        "end": "18:30",
+        "channel_id": "-1002214695720",
+        "days": "Tuesday, Thursday, Saturday",
+        "school": "Школа №44"
+    }
 ]
 
-# Списки с вариантами текста для начала и конца тренировки
-TXT_START_OPTIONS = [
-    "Тренировка началась! Давайте разогреваться!",
-    "Время тренировки наступило! Готовы к действию?",
-    "Начинаем тренировку! Покажем класс!"
-]
-
-TXT_END_OPTIONS = [
-    "Тренировка завершена! Спасибо всем за участие!",
-    "Поздравляем с завершением тренировки! Молодцы!",
-    "Тренировка окончена. Отлично поработали!"
-]
-
-# Функция для получения текущего времени
+# Функция для получения текущего времени в Ташкенте
 def get_current_time():
-    return datetime.now(TASHKENT_TZ)
+    return datetime.now(pytz.timezone('Asia/Tashkent'))
 
-# Функция для выбора случайного текста из списка
-def get_random_text(text_list):
-    return random.choice(text_list)
+# Функция для отправки уведомлений за 10 минут до начала тренировки
+async def send_notifications(context: ContextTypes.DEFAULT_TYPE):
+    current_time = get_current_time()
+    for session in schedule:
+        start_time = datetime.strptime(session["start"], "%H:%M").time()
+        notification_time = (datetime.combine(current_time.date(), start_time) - timedelta(minutes=10)).time()
+        if current_time.time() >= notification_time and current_time.time() < start_time:
+            if current_time.strftime("%A") in session["days"]:
+                await context.bot.send_message(
+                    chat_id=session["trainer_id"],
+                    text=f"Тренировка скоро начинается. Не забудьте опубликовать фотоотчет."
+                )
 
-# Функция для запуска бота
-async def start(update: Update, context):
-    print("Команда /start получена!")  # Логируем команду /start
-    keyboard = [
-        [InlineKeyboardButton("Отправить начало тренировки", callback_data='start')],
-        [InlineKeyboardButton("Отправить конец тренировки", callback_data='end')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text('Добро пожаловать в NOVA Assistant. Я буду помогать вам публиковать фотоотчеты.', reply_markup=reply_markup)
-
-# Функция обработки нажатия на кнопки
-async def button(update: Update, context):
-    query = update.callback_query
-    trainer_id = str(query.from_user.id)
-    
-    # Определяем тексты в зависимости от выбранной кнопки
-    if query.data == 'start':
-        text = get_random_text(TXT_START_OPTIONS)
-    elif query.data == 'end':
-        text = get_random_text(TXT_END_OPTIONS)
+# Обработчик команды /start
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.message.from_user.id)
+    if any(session["trainer_id"] == user_id for session in schedule):
+        reply_markup = ReplyKeyboardMarkup([["отправить начало тренировки", "отправить конец тренировки"]], resize_keyboard=True)
+        await update.message.reply_text(
+            "Добро пожаловать в NOVA Assistant. Я буду помогать вам публиковать фотоотчеты.",
+            reply_markup=reply_markup
+        )
     else:
-        return
-    
-    # Определяем, какой тренер и канал
-    current_time = get_current_time()
-    day_of_week = current_time.strftime('%A')
-    for entry in schedule:
-        if entry['trainer_id'] == trainer_id and day_of_week in entry['days']:
-            channel_id = entry['channel_id']
-            await context.bot.send_message(chat_id=channel_id, text=text)
-            await query.answer()
-            break
+        await update.message.reply_text("Вы не зарегистрированы в системе.")
 
-# Функция отправки уведомлений за 10 минут до начала тренировки
-async def notify_before_training(context, job):
-    trainer_id = job.context['trainer_id']
+# Обработчик сообщений с фото
+async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = str(update.message.from_user.id)
     current_time = get_current_time()
-    day_of_week = current_time.strftime('%A')
-    
-    for entry in schedule:
-        if entry['trainer_id'] == trainer_id and day_of_week in entry['days']:
-            start_time = datetime.strptime(entry['start'], "%H:%M")
-            start_time = TASHKENT_TZ.localize(start_time)  # Приводим время к часовому поясу Ташкента
-            notify_time = start_time - timedelta(minutes=10)
-            
-            if current_time >= notify_time:
-                await context.bot.send_message(chat_id=trainer_id, text="Тренировка скоро начинается. Не забудьте опубликовать фотоотчет.")
-            break
+    for session in schedule:
+        if session["trainer_id"] == user_id and current_time.strftime("%A") in session["days"]:
+            start_time = datetime.strptime(session["start"], "%H:%M").time()
+            end_time = datetime.strptime(session["end"], "%H:%M").time()
+            if current_time.time() >= start_time and current_time.time() <= end_time:
+                try:
+                    if update.message.text == "отправить начало тренировки":
+                        caption = random.choice(start_texts)
+                    elif update.message.text == "отправить конец тренировки":
+                        caption = random.choice(end_texts)
+                    else:
+                        await update.message.reply_text("Неверная команда. Используйте кнопки.")
+                        return
 
-# Функция для проверки расписания и уведомлений
-async def schedule_notifications(update: Update, context):
-    current_time = get_current_time()
-    day_of_week = current_time.strftime('%A')
-    
-    for entry in schedule:
-        if day_of_week in entry['days']:
-            start_time = datetime.strptime(entry['start'], "%H:%M")
-            start_time = TASHKENT_TZ.localize(start_time)
-            notify_time = start_time - timedelta(minutes=10)
-            
-            context.job_queue.run_once(notify_before_training, notify_time, context={'trainer_id': entry['trainer_id']})
+                    # Отправка фото в канал
+                    await context.bot.send_photo(
+                        chat_id=session["channel_id"],
+                        photo=update.message.photo[-1].file_id,
+                        caption=caption
+                    )
 
-async def main():
-    # Настройка бота
-    application = Application.builder().token("BOT_TOKEN").build()  # Замените BOT_TOKEN на ваш токен
-    
-    # Добавляем обработчики команд и кнопок
+                    # Уведомление об успешной публикации
+                    await update.message.reply_text("Фотоотчет успешно отправлен!")
+                except Exception as e:
+                    # Уведомление об ошибке
+                    logging.error(f"Ошибка при отправке фото: {e}")
+                    await update.message.reply_text("Произошла ошибка при отправке фотоотчета. Пожалуйста, попробуйте еще раз.")
+                return
+    await update.message.reply_text("Сейчас не время для отправки фотоотчета.")
+
+# Основная функция
+def main():
+    # Получаем токен из переменных окружения
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise ValueError("Токен бота не найден в переменных окружения!")
+
+    application = ApplicationBuilder().token(token).build()
+
+    # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CallbackQueryHandler(button))
-    
-    # Запуск бота
-    await application.run_polling()
+    application.add_handler(MessageHandler(filters.PHOTO & filters.TEXT, handle_photo))
 
-if __name__ == '__main__':
-    asyncio.run(main())
+    # Запуск уведомлений
+    job_queue = application.job_queue
+    job_queue.run_repeating(send_notifications, interval=60.0, first=0.0)
+
+    # Запуск бота
+    application.run_polling()
+
+if __name__ == "__main__":
+    main()
