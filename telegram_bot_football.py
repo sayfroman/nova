@@ -179,5 +179,5 @@ async def main():
     await application.run_polling()
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    # Убираем asyncio.run(main())
+    main()  # Просто вызываем функцию main(), она будет работать в текущем цикле событий
