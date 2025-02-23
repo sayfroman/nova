@@ -168,5 +168,29 @@ if __name__ == "__main__":
     scheduler.add_job(send_reminder, 'interval', minutes=1)  # Проверка каждую минуту
     scheduler.add_job(check_missed_reports, 'interval', minutes=5)  # Проверка пропущенных отчетов каждую 5 минуту
 
-    scheduler.start()
+# Другие ваши функции
+
+# Например, здесь заканчиваются все другие функции
+# ...
+
+# Теперь вставляем исправленный код
+import asyncio
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+# Создаем цикл событий вручную
+loop = asyncio.get_event_loop()
+scheduler = AsyncIOScheduler(event_loop=loop)
+
+# Добавляем задачи в планировщик
+scheduler.add_job(send_reminder, 'interval', minutes=1)  # Проверка каждую минуту
+scheduler.add_job(check_missed_reports, 'interval', minutes=5)  # Проверка пропущенных отчетов каждую 5 минуту
+
+# Запуск планировщика и бота в асинхронном цикле
+async def on_start():
+    scheduler.start()  # Запуск планировщика
+    await executor.start_polling(dp, skip_updates=True)  # Запуск бота
+
+# Запуск основного цикла
+loop.run_until_complete(on_start())
+
     executor.start_polling(dp, skip_updates=True)
