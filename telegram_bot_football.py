@@ -94,12 +94,13 @@ def log_penalty(trainer_id):
         print(f"Ошибка при записи штрафа в базу данных: {e}")
 
 # Обработчик команды "/start"
-@dp.message_handler(commands=["start"])
 async def send_welcome(message: types.Message):
     await message.reply("Выберите действие:", reply_markup=start_end_keyboard)
 
+# Регистрация обработчика команды "/start"
+dp.register_message_handler(send_welcome, commands=["start"])
+
 # Обработчик для кнопок "Отправить начало тренировки" и "Отправить конец тренировки"
-@dp.message_handler(lambda message: message.text in ["Отправить начало тренировки", "Отправить конец тренировки"])
 async def set_photo_type(message: types.Message):
     user_id = message.from_user.id
     if message.text == "Отправить начало тренировки":
@@ -109,8 +110,10 @@ async def set_photo_type(message: types.Message):
         trainer_state[user_id] = "end"
         await message.reply("Теперь отправьте фото конца тренировки.")
 
+# Регистрация обработчика для кнопок
+dp.register_message_handler(set_photo_type, lambda message: message.text in ["Отправить начало тренировки", "Отправить конец тренировки"])
+
 # Обработчик для получения фотографий
-@dp.message_handler(content_types=[types.ContentType.PHOTO])
 async def handle_photo(message: types.Message):
     user_id = message.from_user.id
     schedule = get_schedule()
