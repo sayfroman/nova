@@ -145,6 +145,8 @@ async def main():
     except RuntimeError:
         # Если цикл событий уже работает, просто пропускаем
         pass
+    finally:
+        await application.shutdown()
 
 if __name__ == "__main__":
     import asyncio
