@@ -241,7 +241,6 @@ def main():
         port=int(os.getenv("PORT", 8443)),
         webhook_url=webhook_url,
         url_path=token,
-        cert=None,  # Если используете HTTPS, укажите путь к сертификату
     )
 
 if __name__ == "__main__":
