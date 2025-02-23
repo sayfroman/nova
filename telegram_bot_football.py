@@ -43,10 +43,7 @@ TXT_END = "txt_end.txt"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()  # Инициализация Dispatcher без передачи Bot
-
-# Привязка бота к диспетчеру
-dp.bind_bot(bot)
+dp = Dispatcher(bot)  # Инициализация Dispatcher с передачей Bot
 
 # Клавиатура с кнопками
 start_end_keyboard = ReplyKeyboardMarkup(
