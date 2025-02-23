@@ -5,7 +5,6 @@ import psycopg2
 from datetime import datetime, timedelta
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from aiogram.utils import executor
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -190,7 +189,4 @@ async def on_start():
 
 # Запуск планировщика и бота
 if __name__ == "__main__":
-    # Просто вызываем асинхронную функцию без явного создания нового цикла событий
- if __name__ == "__main__":
     asyncio.run(on_start())
-
