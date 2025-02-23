@@ -17,11 +17,13 @@ if not DATABASE_URL or not BOT_TOKEN:
     exit(1)
 
 # Подключение к базе данных
-try:
-    DB_CONNECTION = psycopg2.connect(DATABASE_URL)
-except Exception as e:
-    print(f"Ошибка при подключении к базе данных: {e}")
-    exit(1)
+def get_db_connection():
+    """Создает и возвращает подключение к базе данных."""
+    try:
+        return psycopg2.connect(DATABASE_URL)
+    except Exception as e:
+        print(f"Ошибка подключения к базе данных: {e}")
+        return None
 
 # Часовой пояс
 TZ = pytz.timezone("Asia/Tashkent")
@@ -48,10 +50,15 @@ trainer_state = {}  # Словарь для отслеживания стату�
 def get_schedule():
     """Получает расписание из базы данных."""
     try:
-        conn = DB_CONNECTION
+        conn = get_db_connection()
+        if conn is None:
+            return {}
+        
         cursor = conn.cursor()
         cursor.execute("SELECT trainer_id, channel_id, start_time, end_time FROM \"NOVA-TABLE\"")
         data = cursor.fetchall()
+        conn.close()
+        
         return {row[0]: {"channel": row[1], "start": row[2], "end": row[3]} for row in data}
     except Exception as e:
         print(f"Ошибка при получении расписания из базы данных: {e}")
@@ -72,10 +79,13 @@ def get_random_text(file_path):
 def log_penalty(trainer_id):
     """Записывает штраф в базу данных."""
     try:
-        conn = DB_CONNECTION
+        conn = get_db_connection()
+        if conn is None:
+            return
         cursor = conn.cursor()
         cursor.execute("INSERT INTO STRAFS (trainer_id, date) VALUES (%s, %s)", (trainer_id, datetime.now(TZ)))
         conn.commit()
+        conn.close()
     except Exception as e:
         print(f"Ошибка при записи штрафа в базу данных: {e}")
 
@@ -166,19 +176,17 @@ async def check_missed_reports():
             except Exception as e:
                 print(f"Ошибка при отправке уведомления: {e}")
 
-# Создаем цикл событий вручную
-loop = asyncio.get_event_loop()
-scheduler = AsyncIOScheduler(event_loop=loop)
+# Создаем планировщик
+scheduler = AsyncIOScheduler()
 
 # Добавляем задачи в планировщик
 scheduler.add_job(send_reminder, 'interval', minutes=1)  # Проверка каждую минуту
 scheduler.add_job(check_missed_reports, 'interval', minutes=5)  # Проверка пропущенных отчетов каждую 5 минуту
 
-# Запуск планировщика и бота в асинхронном цикле
+# Запуск планировщика и бота
 async def on_start():
     scheduler.start()  # Запуск планировщика
     await executor.start_polling(dp, skip_updates=True)  # Запуск бота
 
-# Запуск планировщика и бота, используя уже существующий цикл
-loop.create_task(on_start())  # Используем create_task для запуска асинхронной задачи
-loop.run_forever()  # Запускаем цикл событий
+# Запуск планировщика и бота
+asyncio.run(on_start())  # Используем asyncio.run для запуска асинхронной задачи
