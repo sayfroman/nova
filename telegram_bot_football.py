@@ -1,13 +1,15 @@
 import os
 from telegram import Update
-from telegram.ext import CallbackContext
-from telegram import Bot, Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
+from telegram.ext import CallbackContext, Application, CommandHandler, MessageHandler, filters
+from telegram import Bot, ReplyKeyboardMarkup, KeyboardButton
 import logging
 from pymongo import MongoClient
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
+import pytz
 
-load_dotenv()  # Загружает переменные из .env файла
+# Загружаем переменные окружения
+load_dotenv()
 MONGO_URI = os.getenv("MONGO_URI")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
@@ -19,15 +21,11 @@ if not MONGO_URI or not BOT_TOKEN:
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# Проверка переменных окружения
-MONGO_URI = os.getenv("MONGO_URI")  # URL подключения к MongoDB
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not MONGO_URI or not BOT_TOKEN:
-    logger.error("Не найдены обязательные переменные окружения!")
-    exit(1)
-
 # Создание бота
 bot = Bot(token=BOT_TOKEN)
+
+# Часовой пояс
+TZ = pytz.timezone("Asia/Tashkent")
 
 # Обработчик команды /start
 async def start(update: Update, context: CallbackContext):
@@ -53,11 +51,11 @@ async def set_photo_type(update: Update, context: CallbackContext):
 async def handle_photo(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     schedule = get_schedule()
-    
+
     if user_id not in schedule:
         await update.message.reply_text("Вы не зарегистрированы в системе.")
         return
-    
+
     if 'photo_type' not in context.user_data:
         await update.message.reply_text("Сначала выберите, какое фото хотите отправить.")
         return
@@ -67,19 +65,19 @@ async def handle_photo(update: Update, context: CallbackContext):
     now = datetime.now(TZ)
     start_time = datetime.strptime(schedule[user_id]["start"], "%H:%M").time()
     end_time = datetime.strptime(schedule[user_id]["end"], "%H:%M").time()
-    
+
     allowed_start = TZ.localize(datetime.combine(now.date(), start_time) - timedelta(minutes=10))
     allowed_end = TZ.localize(datetime.combine(now.date(), end_time) + timedelta(minutes=10))
-    
+
     if photo_type == "start" and allowed_start <= now <= TZ.localize(datetime.combine(now.date(), start_time) + timedelta(minutes=10)):
-        caption = get_random_text(TXT_START)
+        caption = get_random_text("TXT_START")
     elif photo_type == "end" and TZ.localize(datetime.combine(now.date(), end_time) - timedelta(minutes=10)) <= now <= allowed_end:
-        caption = get_random_text(TXT_END)
+        caption = get_random_text("TXT_END")
     else:
         await update.message.reply_text("Фотография отправлена не вовремя. Разрешается отправка за 10 минут до и в течение 10 минут после начала или конца тренировки")
         log_penalty(user_id)
         return
-    
+
     channel_id = schedule[user_id]["channel"]
     await bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=caption)
     await update.message.reply_text("Фото успешно отправлено!")
@@ -90,10 +88,10 @@ def get_schedule():
         db = get_db_connection()
         if db is None:
             return {}
-        
-        schedule_collection = db.schedule  # Получаем коллекцию расписаний
-        schedule_data = schedule_collection.find()  # Получаем все записи
-        
+
+        schedule_collection = db.schedule
+        schedule_data = schedule_collection.find()
+
         logger.debug("Расписание успешно получено из базы данных MongoDB.")
         return {str(row["_id"]): {"channel": row["channel_id"], "start": row["start_time"], "end": row["end_time"]} for row in schedule_data}
     except Exception as e:
@@ -112,9 +110,6 @@ def get_db_connection():
         logger.error(f"Ошибка подключения к базе данных MongoDB: {e}")
         return None
 
-# Часовой пояс
-TZ = pytz.timezone("Asia/Tashkent")
-
 # Функция для отправки напоминания за 10 минут до начала тренировки
 async def send_reminder(context: CallbackContext):
     """Отправляет напоминание за 10 минут до начала тренировки."""
@@ -125,7 +120,7 @@ async def send_reminder(context: CallbackContext):
         start_time = datetime.strptime(data["start"], "%H:%M").time()
         reminder_time = TZ.localize(datetime.combine(now.date(), start_time) - timedelta(minutes=10))
 
-        if now >= reminder_time and now < reminder_time + timedelta(minutes=1):  # Проверяем, если сейчас время напоминания
+        if now >= reminder_time and now < reminder_time + timedelta(minutes=1):
             try:
                 await bot.send_message(
                     user_id,
@@ -142,7 +137,7 @@ async def check_missed_reports(context: CallbackContext):
     for user_id, data in schedule.items():
         end_time = datetime.strptime(data["end"], "%H:%M").time()
         deadline = TZ.localize(datetime.combine(now.date(), end_time) + timedelta(minutes=10))
-        
+
         if now > deadline:
             try:
                 await bot.send_message(CHAT_ID, f"<b>{user_id}</b>, вы не отправили фотоотчет вовремя!", parse_mode="HTML")
@@ -156,7 +151,7 @@ def log_penalty(trainer_id):
         db = get_db_connection()
         if db is None:
             return
-        penalties_collection = db.penalties  # Получаем коллекцию штрафов
+        penalties_collection = db.penalties
         penalties_collection.insert_one({"trainer_id": trainer_id, "date": datetime.now(TZ)})
         logger.debug(f"Штраф для тренера {trainer_id} записан в базу данных MongoDB.")
     except Exception as e:
