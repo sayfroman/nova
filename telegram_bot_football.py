@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 import pytz
-import asyncio
 
 # Создаем объект для часового пояса Ташкента
 TASHKENT_TZ = pytz.timezone('Asia/Tashkent')
@@ -107,7 +106,7 @@ async def schedule_notifications(update: Update, context):
 
 async def main():
     # Настройка бота
-    application = Application.builder().token("YOUR_BOT_TOKEN").build()
+    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
     
     # Добавляем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
@@ -117,7 +116,6 @@ async def main():
     await application.run_polling()
 
 if __name__ == '__main__':
-    # Используем уже существующий цикл событий
-    loop = asyncio.get_event_loop()
-    loop.create_task(main())  # Запускаем как задачу в текущем цикле
-    loop.run_forever()  # Держим цикл событий работающим
+    # Запускаем бота без использования asyncio.run()
+    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
+    application.run_polling()
