@@ -1,7 +1,7 @@
 import random
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, JobQueue
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, filters, JobQueue
 import pytz
 
 # Создаем объект для часового пояса Ташкента
