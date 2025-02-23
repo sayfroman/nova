@@ -1,4 +1,6 @@
 import os
+from telegram import Update
+from telegram.ext import CallbackContext
 from telegram import Bot, Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 import logging
