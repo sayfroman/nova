@@ -192,5 +192,4 @@ async def on_start():
 
 # Запуск основного цикла
 loop.run_until_complete(on_start())
-
     executor.start_polling(dp, skip_updates=True)
