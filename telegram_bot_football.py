@@ -44,16 +44,16 @@ def get_random_text(text_list):
     return random.choice(text_list)
 
 # Функция для запуска бота
-def start(update: Update, context):
+async def start(update: Update, context):
     keyboard = [
         [InlineKeyboardButton("Отправить начало тренировки", callback_data='start')],
         [InlineKeyboardButton("Отправить конец тренировки", callback_data='end')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('Добро пожаловать в NOVA Assistant. Я буду помогать вам публиковать фотоотчеты.', reply_markup=reply_markup)
+    await update.message.reply_text('Добро пожаловать в NOVA Assistant. Я буду помогать вам публиковать фотоотчеты.', reply_markup=reply_markup)
 
 # Функция обработки нажатия на кнопки
-def button(update: Update, context):
+async def button(update: Update, context):
     query = update.callback_query
     trainer_id = str(query.from_user.id)
     
@@ -71,12 +71,12 @@ def button(update: Update, context):
     for entry in schedule:
         if entry['trainer_id'] == trainer_id and day_of_week in entry['days']:
             channel_id = entry['channel_id']
-            context.bot.send_message(chat_id=channel_id, text=text)
-            query.answer()
+            await context.bot.send_message(chat_id=channel_id, text=text)
+            await query.answer()
             break
 
 # Функция отправки уведомлений за 10 минут до начала тренировки
-def notify_before_training(context, job):
+async def notify_before_training(context, job):
     trainer_id = job.context['trainer_id']
     current_time = get_current_time()
     day_of_week = current_time.strftime('%A')
@@ -88,11 +88,11 @@ def notify_before_training(context, job):
             notify_time = start_time - timedelta(minutes=10)
             
             if current_time >= notify_time:
-                context.bot.send_message(chat_id=trainer_id, text="Тренировка скоро начинается. Не забудьте опубликовать фотоотчет.")
+                await context.bot.send_message(chat_id=trainer_id, text="Тренировка скоро начинается. Не забудьте опубликовать фотоотчет.")
             break
 
 # Функция для проверки расписания и уведомлений
-def schedule_notifications(update: Update, context):
+async def schedule_notifications(update: Update, context):
     current_time = get_current_time()
     day_of_week = current_time.strftime('%A')
     
@@ -102,11 +102,12 @@ def schedule_notifications(update: Update, context):
             start_time = TASHKENT_TZ.localize(start_time)
             notify_time = start_time - timedelta(minutes=10)
             
+            # Запускаем задачу уведомления за 10 минут
             context.job_queue.run_once(notify_before_training, notify_time, context={'trainer_id': entry['trainer_id']})
 
-def main():
+async def main():
     # Настройка бота
-    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
+    application = Application.builder().token("YOUR_BOT_TOKEN").build()
     job_queue = application.job_queue
     
     # Добавляем обработчики команд и кнопок
@@ -117,7 +118,8 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT, schedule_notifications))
     
     # Запуск бота
-    application.run_polling()
+    await application.run_polling()
 
 if __name__ == '__main__':
-    main()
+    import asyncio
+    asyncio.run(main())
