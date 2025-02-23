@@ -106,7 +106,7 @@ def schedule_notifications(update: Update, context):
 
 def main():
     # Настройка бота
-    updater = Updater("YOUR_BOT_API_KEY", use_context=True)
+    updater = Updater("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ", use_context=True)
     dp = updater.dispatcher
     job_queue = updater.job_queue
     
