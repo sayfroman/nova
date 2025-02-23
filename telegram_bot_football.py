@@ -169,6 +169,8 @@ async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
     current_time = get_current_time()
+    logging.info(f"Получено фото от пользователя {user_id} в {current_time}")
+
     for session in schedule:
         if session["trainer_id"] == user_id and current_time.strftime("%A") in session["days"]:
             start_time = datetime.strptime(session["start"], "%H:%M").time()
@@ -186,6 +188,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if current_time.time() >= start_photo_start and current_time.time() <= start_photo_end:
                     try:
                         caption = random.choice(start_texts)
+                        logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
                         await context.bot.send_photo(
                             chat_id=session["channel_id"],
                             photo=update.message.photo[-1].file_id,
@@ -202,6 +205,7 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if current_time.time() >= end_photo_start and current_time.time() <= end_photo_end:
                     try:
                         caption = random.choice(end_texts)
+                        logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
                         await context.bot.send_photo(
                             chat_id=session["channel_id"],
                             photo=update.message.photo[-1].file_id,
