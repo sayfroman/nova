@@ -189,4 +189,6 @@ async def on_start():
     await executor.start_polling(dp, skip_updates=True)  # Запуск бота
 
 # Запуск планировщика и бота
-asyncio.run(on_start())  # Используем asyncio.run для запуска асинхронной задачи
+if __name__ == "__main__":
+    # Запускаем цикл событий напрямую
+    asyncio.get_event_loop().run_until_complete(on_start())
