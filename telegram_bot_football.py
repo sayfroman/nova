@@ -115,8 +115,8 @@ schedule = [
     {
         "trainer_id": "7666290317",
         "name": "Адиба",
-        "start": "14:00",
-        "end": "15:00",
+        "start": "23:00",
+        "end": "00:00",
         "channel_id": "-1002309219325",
         "days": "Monday, Wednesday, Sunday",
         "school": "Школа №233"
