@@ -5,6 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from datetime import datetime, timedelta
 import pytz
 import json
+import asyncio
 
 # Загружаем переменные окружения
 from dotenv import load_dotenv
@@ -142,4 +143,4 @@ async def main():
     await application.run_polling()
 
 if __name__ == "__main__":
-    main()  # Просто вызываем функцию main(), она будет работать в текущем цикле событий
+    asyncio.run(main())  # Запускаем асинхронную функцию main() через asyncio.run
