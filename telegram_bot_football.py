@@ -223,6 +223,7 @@ def main():
     if not token:
         raise ValueError("Токен бота не найден в переменных окружения!")
 
+    # Создаем приложение
     application = ApplicationBuilder().token(token).build()
 
     # Регистрация обработчиков
@@ -230,13 +231,18 @@ def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button))
     application.add_handler(MessageHandler(filters.PHOTO & filters.TEXT, handle_photo))
 
-    # Запуск уведомлений
-    job_queue = application.job_queue
-    if job_queue:
-        job_queue.run_repeating(send_notifications, interval=60.0, first=0.0)
+    # Настройка вебхука
+    webhook_url = os.getenv("WEBHOOK_URL")  # URL вашего бота на Railway
+    if not webhook_url:
+        raise ValueError("WEBHOOK_URL не найден в переменных окружения!")
 
-    # Запуск бота
-    application.run_polling()
+    application.run_webhook(
+        listen="0.0.0.0",
+        port=int(os.getenv("PORT", 8443)),
+        webhook_url=webhook_url,
+        url_path=token,
+        cert=None,  # Если используете HTTPS, укажите путь к сертификату
+    )
 
 if __name__ == "__main__":
     main()
