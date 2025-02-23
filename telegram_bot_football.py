@@ -1,7 +1,8 @@
 import logging
 import json
 from datetime import datetime, timedelta
-from telegram import Update, Bot, ParseMode
+from telegram import Update, Bot
+from telegram.constants import ParseMode
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 import os
 os.chmod('telegram_bot_football.py', 0o755)
@@ -9,6 +10,7 @@ os.chmod('telegram_bot_football.py', 0o755)
 # Установим логирование для ошибок
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # Глобальные переменные
 bot = None
