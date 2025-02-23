@@ -10,8 +10,8 @@ import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # Проверка переменных окружения
-DATABASE_URL = os.getenv("${{ Postgres.DATABASE_URL }}")
-BOT_TOKEN = os.getenv("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ")
+DATABASE_URL = os.getenv("DATABASE_URL")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 if not DATABASE_URL or not BOT_TOKEN:
     print("Не найдены обязательные переменные окружения!")
     exit(1)
