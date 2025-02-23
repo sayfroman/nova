@@ -1,10 +1,5 @@
-import os
-import random
-import pytz
-from datetime import datetime, timedelta
 from telegram import Bot, Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
-from telegram.ext import filters
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 import logging
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -32,36 +27,36 @@ if not MONGO_URI or not BOT_TOKEN:
 bot = Bot(token=BOT_TOKEN)
 
 # Обработчик команды /start
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: CallbackContext):
     """Отправляет приветственное сообщение и клавиатуру."""
     keyboard = [
         [KeyboardButton("Отправить начало тренировки")],
         [KeyboardButton("Отправить конец тренировки")]
     ]
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-    update.message.reply_text("Добро пожаловать! Выберите действие:", reply_markup=reply_markup)
+    await update.message.reply_text("Добро пожаловать! Выберите действие:", reply_markup=reply_markup)
 
 # Обработчик для кнопок "Отправить начало тренировки" и "Отправить конец тренировки"
-def set_photo_type(update: Update, context: CallbackContext):
+async def set_photo_type(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     if update.message.text == "Отправить начало тренировки":
         context.user_data['photo_type'] = "start"
-        update.message.reply_text("Теперь отправьте фото начала тренировки.")
+        await update.message.reply_text("Теперь отправьте фото начала тренировки.")
     else:
         context.user_data['photo_type'] = "end"
-        update.message.reply_text("Теперь отправьте фото конца тренировки.")
+        await update.message.reply_text("Теперь отправьте фото конца тренировки.")
 
 # Обработчик для получения фотографий
-def handle_photo(update: Update, context: CallbackContext):
+async def handle_photo(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     schedule = get_schedule()
     
     if user_id not in schedule:
-        update.message.reply_text("Вы не зарегистрированы в системе.")
+        await update.message.reply_text("Вы не зарегистрированы в системе.")
         return
     
     if 'photo_type' not in context.user_data:
-        update.message.reply_text("Сначала выберите, какое фото хотите отправить.")
+        await update.message.reply_text("Сначала выберите, какое фото хотите отправить.")
         return
 
     photo_type = context.user_data.pop('photo_type')  # Забираем и очищаем статус
@@ -78,13 +73,13 @@ def handle_photo(update: Update, context: CallbackContext):
     elif photo_type == "end" and TZ.localize(datetime.combine(now.date(), end_time) - timedelta(minutes=10)) <= now <= allowed_end:
         caption = get_random_text(TXT_END)
     else:
-        update.message.reply_text("Фотография отправлена не вовремя. Разрешается отправка за 10 минут до и в течение 10 минут после начала или конца тренировки")
+        await update.message.reply_text("Фотография отправлена не вовремя. Разрешается отправка за 10 минут до и в течение 10 минут после начала или конца тренировки")
         log_penalty(user_id)
         return
     
     channel_id = schedule[user_id]["channel"]
-    bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=caption)
-    update.message.reply_text("Фото успешно отправлено!")
+    await bot.send_photo(chat_id=channel_id, photo=update.message.photo[-1].file_id, caption=caption)
+    await update.message.reply_text("Фото успешно отправлено!")
 
 # Функция для получения расписания из базы данных MongoDB
 def get_schedule():
@@ -118,7 +113,7 @@ def get_db_connection():
 TZ = pytz.timezone("Asia/Tashkent")
 
 # Функция для отправки напоминания за 10 минут до начала тренировки
-def send_reminder(context: CallbackContext):
+async def send_reminder(context: CallbackContext):
     """Отправляет напоминание за 10 минут до начала тренировки."""
     schedule = get_schedule()
     now = datetime.now(TZ)
@@ -129,7 +124,7 @@ def send_reminder(context: CallbackContext):
 
         if now >= reminder_time and now < reminder_time + timedelta(minutes=1):  # Проверяем, если сейчас время напоминания
             try:
-                bot.send_message(
+                await bot.send_message(
                     user_id,
                     "Скоро у вас начинается тренировка. Не забудьте отправить фото нажав на кнопку 'Отправить начало тренировки'."
                 )
@@ -137,7 +132,7 @@ def send_reminder(context: CallbackContext):
                 logger.error(f"Ошибка при отправке напоминания тренеру {user_id}: {e}")
 
 # Функция для проверки пропущенных отчетов
-def check_missed_reports(context: CallbackContext):
+async def check_missed_reports(context: CallbackContext):
     """Проверяет, кто не отправил фото вовремя, и уведомляет в общий чат."""
     schedule = get_schedule()
     now = datetime.now(TZ)
@@ -147,7 +142,7 @@ def check_missed_reports(context: CallbackContext):
         
         if now > deadline:
             try:
-                bot.send_message(CHAT_ID, f"<b>{user_id}</b>, вы не отправили фотоотчет вовремя!", parse_mode="HTML")
+                await bot.send_message(CHAT_ID, f"<b>{user_id}</b>, вы не отправили фотоотчет вовремя!", parse_mode="HTML")
                 log_penalty(user_id)
             except Exception as e:
                 logger.error(f"Ошибка при отправке уведомления: {e}")
@@ -165,27 +160,26 @@ def log_penalty(trainer_id):
         logger.error(f"Ошибка при записи штрафа в базу данных MongoDB: {e}")
 
 # Запуск бота
-def main():
+async def main():
     """Запуск бота и планировщика."""
-    updater = Updater(token=BOT_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
+    application = Application.builder().token(BOT_TOKEN).build()
 
     # Обработчики команд
-    dispatcher.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("start", start))
 
     # Обработчик для кнопок
-    dispatcher.add_handler(MessageHandler(filters.TEXT, set_photo_type))
+    application.add_handler(MessageHandler(filters.TEXT, set_photo_type))
 
     # Обработчик для получения фото
-    dispatcher.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     # Запуск напоминаний и проверки пропущенных отчетов
-    updater.job_queue.run_repeating(send_reminder, interval=60, first=0)
-    updater.job_queue.run_repeating(check_missed_reports, interval=60, first=0)
+    application.job_queue.run_repeating(send_reminder, interval=60, first=0)
+    application.job_queue.run_repeating(check_missed_reports, interval=60, first=0)
 
     # Запуск бота
-    updater.start_polling()
-    updater.idle()
+    await application.run_polling()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
