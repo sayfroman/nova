@@ -152,6 +152,7 @@ async def send_notifications(context: CallbackContext):
 # Обработчик команды /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
+    logging.info(f"Получена команда /start от пользователя {user_id}")
     if any(session["trainer_id"] == user_id for session in schedule):
         reply_markup = ReplyKeyboardMarkup([["отправить начало тренировки", "отправить конец тренировки"]], resize_keyboard=True)
         await update.message.reply_text(
