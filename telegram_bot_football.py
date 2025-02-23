@@ -1,7 +1,7 @@
 import random
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, filters, JobQueue
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, JobQueue
 import pytz
 
 # Создаем объект для часового пояса Ташкента
@@ -106,19 +106,18 @@ def schedule_notifications(update: Update, context):
 
 def main():
     # Настройка бота
-    updater = Updater("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ", use_context=True)
-    dp = updater.dispatcher
-    job_queue = updater.job_queue
+    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
+    job_queue = application.job_queue
     
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CallbackQueryHandler(button))
+    # Добавляем обработчики команд и кнопок
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button))
     
     # Расписание уведомлений
-    dp.add_handler(MessageHandler(Filters.text, schedule_notifications))
+    application.add_handler(MessageHandler(filters.TEXT, schedule_notifications))
     
     # Запуск бота
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
