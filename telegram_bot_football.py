@@ -3,7 +3,8 @@ import random
 import pytz
 from datetime import datetime, timedelta
 from telegram import Bot, Update, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import Updater, CommandHandler, MessageHandler, CallbackContext
+from telegram.ext import filters
 import logging
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -173,10 +174,10 @@ def main():
     dispatcher.add_handler(CommandHandler("start", start))
 
     # Обработчик для кнопок
-    dispatcher.add_handler(MessageHandler(Filters.text, set_photo_type))
+    dispatcher.add_handler(MessageHandler(filters.TEXT, set_photo_type))
 
     # Обработчик для получения фото
-    dispatcher.add_handler(MessageHandler(Filters.photo, handle_photo))
+    dispatcher.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     # Запуск напоминаний и проверки пропущенных отчетов
     updater.job_queue.run_repeating(send_reminder, interval=60, first=0)
