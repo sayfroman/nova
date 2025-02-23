@@ -29,6 +29,22 @@ if not MONGO_URI or not BOT_TOKEN:
     logger.error("Не найдены обязательные переменные окружения!")
     exit(1)
 
+# Создание бота и диспетчера
+bot = Bot(token=BOT_TOKEN)
+dp = Dispatcher(bot)
+
+# Обработчик команды /start
+async def send_welcome(message: types.Message):
+    await message.answer("Добро пожаловать!")
+
+# Регистрация обработчика команды /start с новым синтаксисом
+dp.message.register(send_welcome, commands=["start"])
+
+# Запуск бота
+if __name__ == '__main__':
+    from aiogram.utils import executor
+    executor.start_polling(dp, skip_updates=True)
+
 # Подключение к базе данных MongoDB
 def get_db_connection():
     """Создает и возвращает подключение к базе данных MongoDB."""
