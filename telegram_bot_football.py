@@ -36,7 +36,7 @@ TXT_END = "txt_end.txt"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher(bot=bot)  # Инициализация Dispatcher с передачей Bot через параметр
+dp = Dispatcher(bot)  # Инициализация Dispatcher с передачей Bot
 
 # Клавиатура с кнопками
 start_end_keyboard = ReplyKeyboardMarkup(
@@ -93,12 +93,12 @@ def log_penalty(trainer_id):
         print(f"Ошибка при записи штрафа в базу данных: {e}")
 
 # Обработчик команды "/start"
-@dp.message_handler(commands=["start"])
 async def send_welcome(message: types.Message):
     await message.reply("Выберите действие:", reply_markup=start_end_keyboard)
 
+dp.register_message_handler(send_welcome, commands=["start"])
+
 # Обработчик для кнопок "Отправить начало тренировки" и "Отправить конец тренировки"
-@dp.message_handler(lambda message: message.text in ["Отправить начало тренировки", "Отправить конец тренировки"])
 async def set_photo_type(message: types.Message):
     user_id = message.from_user.id
     if message.text == "Отправить начало тренировки":
@@ -108,8 +108,9 @@ async def set_photo_type(message: types.Message):
         trainer_state[user_id] = "end"
         await message.reply("Теперь отправьте фото конца тренировки.")
 
+dp.register_message_handler(set_photo_type, lambda message: message.text in ["Отправить начало тренировки", "Отправить конец тренировки"])
+
 # Обработчик для получения фотографий
-@dp.message_handler(content_types=[types.ContentType.PHOTO])
 async def handle_photo(message: types.Message):
     user_id = message.from_user.id
     schedule = get_schedule()
@@ -143,6 +144,8 @@ async def handle_photo(message: types.Message):
     channel_id = schedule[user_id]["channel"]
     await bot.send_photo(chat_id=channel_id, photo=message.photo[-1].file_id, caption=caption)
     await message.reply("Фото успешно отправлено!")
+
+dp.register_message_handler(handle_photo, content_types=[types.ContentType.PHOTO])
 
 # Функция для отправки напоминания за 10 минут до начала тренировки
 async def send_reminder():
