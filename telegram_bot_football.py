@@ -107,7 +107,7 @@ async def schedule_notifications(update: Update, context):
 
 async def main():
     # Настройка бота
-    application = Application.builder().token("BOT_TOKEN).build()
+    application = Application.builder().token("BOT_TOKEN").build()
     
     # Добавляем обработчики команд и кнопок
     application.add_handler(CommandHandler("start", start))
