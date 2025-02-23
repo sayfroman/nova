@@ -1,129 +1,124 @@
-import logging
-import json
+import random
 from datetime import datetime, timedelta
-from telegram import Update, Bot, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
-import os
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, JobQueue
+import pytz
 
-# Установим логирование для ошибок
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Создаем объект для часового пояса Ташкента
+TASHKENT_TZ = pytz.timezone('Asia/Tashkent')
 
-# Глобальные переменные
-bot = None
-schedule_data = {}
-photo_time_window = timedelta(minutes=10)
-photo_channel = '@your_channel'  # Укажите канал, в который будете отправлять фото
+# Расписание тренеров
+schedule = [
+    {"trainer_id": "6969603804", "name": "Бунед", "start": "17:00", "end": "18:00", "channel_id": "-1002331628469", "days": "Monday, Wednesday, Friday", "school": "Школа №295"},
+    {"trainer_id": "413625395", "name": "Алексей", "start": "17:00", "end": "18:00", "channel_id": "-1002432571124", "days": "Monday, Wednesday, Friday", "school": "Школа №101"},
+    {"trainer_id": "735570267", "name": "Марко", "start": "14:00", "end": "15:00", "channel_id": "-1002323472696", "days": "Monday, Wednesday, Friday", "school": "Школа №307"},
+    {"trainer_id": "735570267", "name": "Марко", "start": "17:00", "end": "18:00", "channel_id": "-1002323472696", "days": "Monday, Wednesday, Friday", "school": "Школа №307"},
+    {"trainer_id": "1532520919", "name": "Сардор", "start": "15:00", "end": "16:00", "channel_id": "-1002231891578", "days": "Monday, Wednesday, Friday", "school": "Школа №328"},
+    {"trainer_id": "606134505", "name": "Миржалол", "start": "17:30", "end": "18:30", "channel_id": "-1002413556142", "days": "Tuesday, Thursday, Saturday", "school": "Школа №186"},
+    {"trainer_id": "735570267", "name": "Марко", "start": "17:00", "end": "18:00", "channel_id": "-1002246173492", "days": "Tuesday, Thursday, Saturday", "school": "Школа №178"},
+    {"trainer_id": "413625395", "name": "Алексей", "start": "15:00", "end": "16:00", "channel_id": "-1002460005367", "days": "Monday, Wednesday, Friday", "school": "Школа №254"},
+    {"trainer_id": "6969603804", "name": "Бунед", "start": "15:00", "end": "16:00", "channel_id": "-1002344879265", "days": "Monday, Wednesday, Friday", "school": "Школа №117"},
+    {"trainer_id": "7666290317", "name": "Адиба", "start": "14:00", "end": "15:00", "channel_id": "-1002309219325", "days": "Monday, Wednesday, Sunday", "school": "Школа №233"},
+    {"trainer_id": "6969603804", "name": "Бунед", "start": "17:30", "end": "18:30", "channel_id": "-1002214695720", "days": "Tuesday, Thursday, Saturday", "school": "Школа №44"}
+]
 
-# Загрузка расписания тренеров
-def load_schedule():
-    global schedule_data
-    try:
-        with open('schedule.json', 'r') as file:
-            schedule_data = json.load(file)
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке расписания: {e}")
-        raise
+# Списки с вариантами текста для начала и конца тренировки
+TXT_START_OPTIONS = [
+    "Тренировка началась! Давайте разогреваться!",
+    "Время тренировки наступило! Готовы к действию?",
+    "Начинаем тренировку! Покажем класс!"
+]
 
-# Чтение текста для начала и конца тренировки
-def load_texts():
-    try:
-        with open('txt_start.txt', 'r') as file:
-            start_text = file.read().strip()
-        with open('txt_end.txt', 'r') as file:
-            end_text = file.read().strip()
-        return start_text, end_text
-    except Exception as e:
-        logger.error(f"Ошибка при загрузке текста: {e}")
-        raise
+TXT_END_OPTIONS = [
+    "Тренировка завершена! Спасибо всем за участие!",
+    "Поздравляем с завершением тренировки! Молодцы!",
+    "Тренировка окончена. Отлично поработали!"
+]
 
-start_text, end_text = load_texts()
+# Функция для получения текущего времени
+def get_current_time():
+    return datetime.now(TASHKENT_TZ)
 
-# Функция приветствия
-async def start(update: Update, context: CallbackContext) -> None:
-    logger.info(f"Команда /start получена от {update.message.from_user.id}")
-    await update.message.reply_text(
-        "Добро пожаловать в NOVA Assistant! Я буду помогать вам публиковать фотоотчеты ваших тренировок. Просто выберите нужную команду и отправьте одну фотографию начала или конца тренировки.",
-        reply_markup=None
-    )
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text="Выберите команду:",
-        reply_markup=ReplyKeyboardMarkup([["Отправить начало тренировки", "Отправить конец тренировки"]], one_time_keyboard=True)
-    )
+# Функция для выбора случайного текста из списка
+def get_random_text(text_list):
+    return random.choice(text_list)
 
-# Функция для получения и обработки фотографий
-async def handle_photo(update: Update, context: CallbackContext) -> None:
-    logger.info(f"Фото получено от {update.message.from_user.id}")
-    # Получаем данные тренера
-    user_id = update.message.from_user.id
-    chat_id = update.message.chat_id
-    photo = update.message.photo[-1].file_id
+# Функция для запуска бота
+def start(update: Update, context):
+    keyboard = [
+        [InlineKeyboardButton("Отправить начало тренировки", callback_data='start')],
+        [InlineKeyboardButton("Отправить конец тренировки", callback_data='end')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    update.message.reply_text('Добро пожаловать в NOVA Assistant. Я буду помогать вам публиковать фотоотчеты.', reply_markup=reply_markup)
 
-    # Определяем, что это за фотография
-    if update.message.caption == "Отправить начало тренировки":
-        action = "start"
-    elif update.message.caption == "Отправить конец тренировки":
-        action = "end"
+# Функция обработки нажатия на кнопки
+def button(update: Update, context):
+    query = update.callback_query
+    trainer_id = str(query.from_user.id)
+    
+    # Определяем тексты в зависимости от выбранной кнопки
+    if query.data == 'start':
+        text = get_random_text(TXT_START_OPTIONS)
+    elif query.data == 'end':
+        text = get_random_text(TXT_END_OPTIONS)
     else:
-        await update.message.reply_text("Ошибка: неправильная команда.")
         return
+    
+    # Определяем, какой тренер и канал
+    current_time = get_current_time()
+    day_of_week = current_time.strftime('%A')
+    for entry in schedule:
+        if entry['trainer_id'] == trainer_id and day_of_week in entry['days']:
+            channel_id = entry['channel_id']
+            context.bot.send_message(chat_id=channel_id, text=text)
+            query.answer()
+            break
 
-    # Проверяем время фотографии
-    if not is_within_time_window(action):
-        await update.message.reply_text("Фото отправлено в неподобающий момент. Пожалуйста, попробуйте снова.")
-        return
+# Функция отправки уведомлений за 10 минут до начала тренировки
+def notify_before_training(context, job):
+    trainer_id = job.context['trainer_id']
+    current_time = get_current_time()
+    day_of_week = current_time.strftime('%A')
+    
+    for entry in schedule:
+        if entry['trainer_id'] == trainer_id and day_of_week in entry['days']:
+            start_time = datetime.strptime(entry['start'], "%H:%M")
+            start_time = TASHKENT_TZ.localize(start_time)  # Приводим время к часовому поясу Ташкента
+            notify_time = start_time - timedelta(minutes=10)
+            
+            if current_time >= notify_time:
+                context.bot.send_message(chat_id=trainer_id, text="Тренировка скоро начинается. Не забудьте опубликовать фотоотчет.")
+            break
 
-    # Получаем текст и отправляем фото
-    if action == "start":
-        text_to_send = start_text
-    elif action == "end":
-        text_to_send = end_text
+# Функция для проверки расписания и уведомлений
+def schedule_notifications(update: Update, context):
+    current_time = get_current_time()
+    day_of_week = current_time.strftime('%A')
+    
+    for entry in schedule:
+        if day_of_week in entry['days']:
+            start_time = datetime.strptime(entry['start'], "%H:%M")
+            start_time = TASHKENT_TZ.localize(start_time)
+            notify_time = start_time - timedelta(minutes=10)
+            
+            context.job_queue.run_once(notify_before_training, notify_time, context={'trainer_id': entry['trainer_id']})
 
-    try:
-        # Публикуем фото
-        await context.bot.send_photo(chat_id=photo_channel, photo=photo, caption=text_to_send)
-        await update.message.reply_text("Фотография опубликована. Спасибо большое!")
-    except Exception as e:
-        logger.error(f"Ошибка при публикации фото: {e}")
-        await update.message.reply_text("Ошибка при публикации фотографии. Пожалуйста, попробуйте снова.")
-
-# Проверка, что фото отправлено в допустимое время
-def is_within_time_window(action: str) -> bool:
-    now = datetime.now()
-    # Получаем информацию о тренировки
-    schedule_info = get_schedule_for_user(user_id)
-    training_start = schedule_info['start']
-    training_end = schedule_info['end']
-
-    # Проверяем, что фото отправлено в пределах 10 минут
-    if action == "start" and (now - training_start).seconds <= photo_time_window.seconds:
-        return True
-    if action == "end" and (now - training_end).seconds <= photo_time_window.seconds:
-        return True
-    return False
-
-# Функция для работы с расписанием
-def get_schedule_for_user(user_id: int) -> dict:
-    # Здесь будет код для извлечения информации о расписании из schedule.json
-    # Для упрощения пока возвращаем фиктивные данные
-    return {"start": datetime(2025, 2, 23, 10, 0), "end": datetime(2025, 2, 23, 11, 0)}
-
-# Основная функция для запуска бота
-async def main():
-    logger.info("Запуск бота...")
-    application = Application.builder().token("YOUR_BOT_TOKEN").build()
-
-    # Загрузка данных
-    load_schedule()
-
-    # Обработчики
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-
+def main():
+    # Настройка бота
+    updater = Updater("YOUR_BOT_API_KEY", use_context=True)
+    dp = updater.dispatcher
+    job_queue = updater.job_queue
+    
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CallbackQueryHandler(button))
+    
+    # Расписание уведомлений
+    dp.add_handler(MessageHandler(Filters.text, schedule_notifications))
+    
     # Запуск бота
-    await application.run_polling()
+    updater.start_polling()
+    updater.idle()
 
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main())
+    main()
