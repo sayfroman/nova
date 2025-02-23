@@ -17,7 +17,11 @@ if not DATABASE_URL or not BOT_TOKEN:
     exit(1)
 
 # Подключение к базе данных
-DB_CONNECTION = psycopg2.connect(DATABASE_URL)
+try:
+    DB_CONNECTION = psycopg2.connect(DATABASE_URL)
+except Exception as e:
+    print(f"Ошибка при подключении к базе данных: {e}")
+    exit(1)
 
 # Часовой пояс
 TZ = pytz.timezone("Asia/Tashkent")
