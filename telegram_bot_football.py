@@ -45,6 +45,7 @@ def get_random_text(text_list):
 
 # Функция для запуска бота
 async def start(update: Update, context):
+    print("Команда /start получена!")  # Логируем команду /start
     keyboard = [
         [InlineKeyboardButton("Отправить начало тренировки", callback_data='start')],
         [InlineKeyboardButton("Отправить конец тренировки", callback_data='end')]
