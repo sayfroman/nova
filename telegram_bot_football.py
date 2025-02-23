@@ -1,6 +1,6 @@
 import logging
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext
 import random
 from datetime import datetime, timedelta
 import pytz
@@ -137,7 +137,7 @@ def get_current_time():
     return datetime.now(pytz.timezone('Asia/Tashkent'))
 
 # Функция для отправки уведомлений за 10 минут до начала тренировки
-async def send_notifications(context: ContextTypes.DEFAULT_TYPE):
+async def send_notifications(context: CallbackContext):
     current_time = get_current_time()
     for session in schedule:
         start_time = datetime.strptime(session["start"], "%H:%M").time()
