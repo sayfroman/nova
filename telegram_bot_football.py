@@ -36,7 +36,7 @@ TXT_END = "txt_end.txt"
 
 # Инициализация бота и диспетчера
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(bot)
 
 # Клавиатура с кнопками
 start_end_keyboard = ReplyKeyboardMarkup(
@@ -93,12 +93,12 @@ def log_penalty(trainer_id):
         print(f"Ошибка при записи штрафа в базу данных: {e}")
 
 # Обработчик команды "/start"
-@dp.message_handler(commands=["start"])
+@dp.message(commands=["start"])
 async def send_welcome(message: types.Message):
     await message.reply("Выберите действие:", reply_markup=start_end_keyboard)
 
 # Обработчик для кнопок "Отправить начало тренировки" и "Отправить конец тренировки"
-@dp.message_handler(lambda message: message.text in ["Отправить начало тренировки", "Отправить конец тренировки"])
+@dp.message(lambda message: message.text in ["Отправить начало тренировки", "Отправить конец тренировки"])
 async def set_photo_type(message: types.Message):
     user_id = message.from_user.id
     if message.text == "Отправить начало тренировки":
@@ -109,7 +109,7 @@ async def set_photo_type(message: types.Message):
         await message.reply("Теперь отправьте фото конца тренировки.")
 
 # Обработчик для получения фотографий
-@dp.message_handler(content_types=[types.ContentType.PHOTO])
+@dp.message(content_types=[types.ContentType.PHOTO])
 async def handle_photo(message: types.Message):
     user_id = message.from_user.id
     schedule = get_schedule()
