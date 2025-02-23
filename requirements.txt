@@ -1,5 +1,2 @@
-python-telegram-bot
-gspread
-apscheduler
-pytz
-python-dotenv
+python-telegram-bot==20.0
+pytz==2023.3
