@@ -1,10 +1,10 @@
-import os
 import logging
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import random
 from datetime import datetime, timedelta
 import pytz
+import os
 
 # Настройка логирования
 logging.basicConfig(
@@ -161,6 +161,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("Вы не зарегистрированы в системе.")
 
+# Обработчик нажатия на кнопки
+async def handle_button(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Пожалуйста, отправьте фотографию.")
+
 # Обработчик сообщений с фото
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = str(update.message.from_user.id)
@@ -169,31 +173,48 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if session["trainer_id"] == user_id and current_time.strftime("%A") in session["days"]:
             start_time = datetime.strptime(session["start"], "%H:%M").time()
             end_time = datetime.strptime(session["end"], "%H:%M").time()
-            if current_time.time() >= start_time and current_time.time() <= end_time:
-                try:
-                    if update.message.text == "отправить начало тренировки":
+
+            # Время для принятия фото начала тренировки: за 10 минут до начала и 15 минут после
+            start_photo_start = (datetime.combine(current_time.date(), start_time) - timedelta(minutes=10)).time()
+            start_photo_end = (datetime.combine(current_time.date(), start_time) + timedelta(minutes=15)).time()
+
+            # Время для принятия фото конца тренировки: за 10 минут до конца и 15 минут после
+            end_photo_start = (datetime.combine(current_time.date(), end_time) - timedelta(minutes=10)).time()
+            end_photo_end = (datetime.combine(current_time.date(), end_time) + timedelta(minutes=15)).time()
+
+            if update.message.text == "отправить начало тренировки":
+                if current_time.time() >= start_photo_start and current_time.time() <= start_photo_end:
+                    try:
                         caption = random.choice(start_texts)
-                    elif update.message.text == "отправить конец тренировки":
+                        await context.bot.send_photo(
+                            chat_id=session["channel_id"],
+                            photo=update.message.photo[-1].file_id,
+                            caption=caption
+                        )
+                        await update.message.reply_text("Фото успешно опубликовано!")
+                    except Exception as e:
+                        logging.error(f"Ошибка при отправке фото: {e}")
+                        await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
+                else:
+                    await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
+
+            elif update.message.text == "отправить конец тренировки":
+                if current_time.time() >= end_photo_start and current_time.time() <= end_photo_end:
+                    try:
                         caption = random.choice(end_texts)
-                    else:
-                        await update.message.reply_text("Неверная команда. Используйте кнопки.")
-                        return
-
-                    # Отправка фото в канал
-                    await context.bot.send_photo(
-                        chat_id=session["channel_id"],
-                        photo=update.message.photo[-1].file_id,
-                        caption=caption
-                    )
-
-                    # Уведомление об успешной публикации
-                    await update.message.reply_text("Фотоотчет успешно отправлен!")
-                except Exception as e:
-                    # Уведомление об ошибке
-                    logging.error(f"Ошибка при отправке фото: {e}")
-                    await update.message.reply_text("Произошла ошибка при отправке фотоотчета. Пожалуйста, попробуйте еще раз.")
-                return
-    await update.message.reply_text("Сейчас не время для отправки фотоотчета.")
+                        await context.bot.send_photo(
+                            chat_id=session["channel_id"],
+                            photo=update.message.photo[-1].file_id,
+                            caption=caption
+                        )
+                        await update.message.reply_text("Фото успешно опубликовано!")
+                    except Exception as e:
+                        logging.error(f"Ошибка при отправке фото: {e}")
+                        await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
+                else:
+                    await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
+            return
+    await update.message.reply_text("Вы не зарегистрированы в системе.")
 
 # Основная функция
 def main():
@@ -206,11 +227,13 @@ def main():
 
     # Регистрация обработчиков
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_button))
     application.add_handler(MessageHandler(filters.PHOTO & filters.TEXT, handle_photo))
 
     # Запуск уведомлений
     job_queue = application.job_queue
-    job_queue.run_repeating(send_notifications, interval=60.0, first=0.0)
+    if job_queue:
+        job_queue.run_repeating(send_notifications, interval=60.0, first=0.0)
 
     # Запуск бота
     application.run_polling()
