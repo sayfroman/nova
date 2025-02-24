@@ -160,4 +160,13 @@ async def main() -> None:
     await application.run_polling()
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        # Пытаемся запустить asyncio.run()
+        asyncio.run(main())
+    except RuntimeError as e:
+        # Если asyncio.run() не работает (например, в Jupyter), используем альтернативный подход
+        if "event loop is already running" in str(e):
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(main())
+        else:
+            raise e
