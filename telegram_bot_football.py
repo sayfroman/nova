@@ -137,7 +137,8 @@ notification_sent = {session["trainer_id"]: False for session in schedule}
 
 # Функция для получения текущего времени в Ташкенте
 def get_current_time():
-    return datetime.now(pytz.timezone('Asia/Tashkent'))
+    tz = pytz.timezone('Asia/Tashkent')
+    return datetime.now(tz)
 
 # Функция для отправки уведомлений за 10 минут до начала тренировки
 async def send_notifications(context: CallbackContext):
@@ -206,38 +207,45 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
             end_photo_start = (datetime.combine(current_time.date(), end_time) - timedelta(minutes=10)).time()
             end_photo_end = (datetime.combine(current_time.date(), end_time) + timedelta(minutes=15)).time()
 
+            # Логирование для отладки
+            logging.info(f"Текущее время: {current_time.time()}")
             logging.info(f"Время начала тренировки: {start_time}, Время окончания: {end_time}")
             logging.info(f"Диапазон для фото начала: {start_photo_start} - {start_photo_end}")
             logging.info(f"Диапазон для фото окончания: {end_photo_start} - {end_photo_end}")
 
-            if current_time.time() >= start_photo_start and current_time.time() <= start_photo_end:
-                try:
-                    caption = random.choice(start_texts)
-                    logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
-                    await context.bot.send_photo(
-                        chat_id=session["channel_id"],
-                        photo=update.message.photo[-1].file_id,
-                        caption=caption
-                    )
-                    await update.message.reply_text("Фото успешно опубликовано!")
-                except Exception as e:
-                    logging.error(f"Ошибка при отправке фото: {e}")
-                    await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
-            elif current_time.time() >= end_photo_start and current_time.time() <= end_photo_end:
-                try:
-                    caption = random.choice(end_texts)
-                    logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
-                    await context.bot.send_photo(
-                        chat_id=session["channel_id"],
-                        photo=update.message.photo[-1].file_id,
-                        caption=caption
-                    )
-                    await update.message.reply_text("Фото успешно опубликовано!")
-                except Exception as e:
-                    logging.error(f"Ошибка при отправке фото: {e}")
-                    await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
-            else:
-                await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
+            if update.message.text == "отправить начало тренировки":
+                if start_photo_start <= current_time.time() <= start_photo_end:
+                    try:
+                        caption = random.choice(start_texts)
+                        logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
+                        await context.bot.send_photo(
+                            chat_id=session["channel_id"],
+                            photo=update.message.photo[-1].file_id,
+                            caption=caption
+                        )
+                        await update.message.reply_text("Фото успешно опубликовано!")
+                    except Exception as e:
+                        logging.error(f"Ошибка при отправке фото: {e}")
+                        await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
+                else:
+                    await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
+
+            elif update.message.text == "отправить конец тренировки":
+                if end_photo_start <= current_time.time() <= end_photo_end:
+                    try:
+                        caption = random.choice(end_texts)
+                        logging.info(f"Попытка отправить фото в канал {session['channel_id']}")
+                        await context.bot.send_photo(
+                            chat_id=session["channel_id"],
+                            photo=update.message.photo[-1].file_id,
+                            caption=caption
+                        )
+                        await update.message.reply_text("Фото успешно опубликовано!")
+                    except Exception as e:
+                        logging.error(f"Ошибка при отправке фото: {e}")
+                        await update.message.reply_text("Фото не опубликовано, повторите заново, нажав /start")
+                else:
+                    await update.message.reply_text("Сейчас не время для фотоотчета. Проверьте свое расписание.")
             return
     await update.message.reply_text("Вы не зарегистрированы в системе.")
 
