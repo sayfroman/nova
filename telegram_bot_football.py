@@ -143,7 +143,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
 
 async def main() -> None:
     # Вставьте сюда ваш токен
-    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
+    application = Application.builder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
 
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
@@ -155,12 +155,12 @@ async def main() -> None:
 
 if __name__ == '__main__':
     try:
-        # Используем существующий цикл событий, если он уже запущен
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(main())
+        # Пытаемся запустить asyncio.run()
+        asyncio.run(main())
     except RuntimeError as e:
-        # Если цикл событий не запущен, создаем новый
+        # Если asyncio.run() не работает (например, в Jupyter), используем альтернативный подход
         if "event loop is already running" in str(e):
-            asyncio.run(main())
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(main())
         else:
             raise e
