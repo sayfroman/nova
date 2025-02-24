@@ -1,3 +1,4 @@
+import os
 import logging
 import random
 import asyncio
@@ -13,6 +14,11 @@ from telegram.ext import (
 # Логирование
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Получение токена из переменных окружения
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+if not TOKEN:
+    raise ValueError("Токен бота не найден в переменных окружения!")
 
 # Текстовые шаблоны
 TXT_START = [
@@ -142,8 +148,8 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
         await update.message.reply_text("Выбери действие:", reply_markup=ReplyKeyboardMarkup([["Отправить начало тренировки", "Выбрать филиал"]], one_time_keyboard=True))
 
 async def main() -> None:
-    # Вставьте сюда ваш токен
-    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
+    # Создаем приложение с токеном из переменных окружения
+    application = Application.builder().token(TOKEN).build()
 
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
@@ -154,13 +160,4 @@ async def main() -> None:
     await application.run_polling()
 
 if __name__ == '__main__':
-    try:
-        # Пытаемся запустить asyncio.run()
-        asyncio.run(main())
-    except RuntimeError as e:
-        # Если asyncio.run() не работает (например, в Jupyter), используем альтернативный подход
-        if "event loop is already running" in str(e):
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(main())
-        else:
-            raise e
+    asyncio.run(main())
