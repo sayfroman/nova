@@ -1,5 +1,5 @@
 from telegram import Bot, Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import CommandHandler, MessageHandler, Filters, CallbackContext, Updater, ConversationHandler
+from telegram.ext import CommandHandler, MessageHandler, filters, CallbackContext, Updater, ConversationHandler
 import random
 
 # Словари с текстами для публикаций
