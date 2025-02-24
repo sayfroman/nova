@@ -1,7 +1,13 @@
 import logging
 import random
 from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    filters,  # Используем filters вместо Filters
+    CallbackContext,
+)
 
 # Логирование
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -136,13 +142,13 @@ def handle_photo(update: Update, context: CallbackContext) -> None:
 
 def main() -> None:
     # Вставьте сюда ваш токен
-    updater = Updater("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ")
+    updater = Updater("YOUR_TELEGRAM_BOT_TOKEN")
 
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
-    dispatcher.add_handler(MessageHandler(Filters.photo, handle_photo))
+    dispatcher.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Используем filters.TEXT
+    dispatcher.add_handler(MessageHandler(filters.PHOTO, handle_photo))  # Используем filters.PHOTO
 
     updater.start_polling()
     updater.idle()
