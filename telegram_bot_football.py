@@ -1,28 +1,31 @@
-from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    MessageHandler,
-    filters,
-    CallbackContext,
-    ConversationHandler,
-)
+import logging
 import random
-import asyncio
+from telegram import Update, ReplyKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 
-# Константы для состояний
-CHOOSE_BRANCH, CHOOSE_ACTION, SEND_PHOTO = range(3)
+# Логирование
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Словари с текстами для публикаций
+# Текстовые шаблоны
 TXT_START = [
-    "Тренировка началась!", "Поехали!", "Время тренировки!", "Готовы к тренировке!", "Начинаем!"
-]
-TXT_END = [
-    "Тренировка завершена!", "Хорошая работа!", "Конец тренировки!", "Отличная тренировка!", "Все молодцы!"
+    "Начало тренировки! 💪",
+    "Поехали! 🚀",
+    "Время работать! ⏰",
+    "Тренировка стартовала! 🏋️‍♂️",
+    "Погнали! 🏃‍♂️"
 ]
 
-# Привязка пользователей к филиалам
-USER_CHANNELS = {
+TXT_END = [
+    "Тренировка завершена! 🎉",
+    "Отлично потрудились! 👏",
+    "Завершение тренировки! ✅",
+    "Молодцы! 🌟",
+    "До следующей тренировки! 👋"
+]
+
+# Данные пользователей и филиалов
+users = {
     6969603804: {
         "trainer_name": "Бунед",
         "branches": [
@@ -65,109 +68,84 @@ USER_CHANNELS = {
     }
 }
 
-# Функция старта
-async def start(update: Update, context: CallbackContext):
+# Состояния пользователей
+user_data = {}
+
+def start(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
-    
-    if user_id in USER_CHANNELS:
-        buttons = [[branch["name"]] for branch in USER_CHANNELS[user_id]["branches"]]
-        reply_markup = ReplyKeyboardMarkup(buttons, one_time_keyboard=True, resize_keyboard=True)
-        await update.message.reply_text("Выберите филиал:", reply_markup=reply_markup)
-        return CHOOSE_BRANCH
+    if user_id in users:
+        user_name = users[user_id]["trainer_name"]
+        branch_names = [branch["name"] for branch in users[user_id]["branches"]]
+        update.message.reply_text(f"Привет, {user_name}! Выбери филиал:", reply_markup=ReplyKeyboardMarkup([branch_names], one_time_keyboard=True))
+        user_data[user_id] = {"step": "choose_branch"}
     else:
-        await update.message.reply_text("У вас нет доступа к филиалам.")
-        return ConversationHandler.END
+        update.message.reply_text("Извините, вы не зарегистрированы.")
 
-# Выбор филиала
-async def choose_branch(update: Update, context: CallbackContext):
+def handle_message(update: Update, context: CallbackContext) -> None:
     user_id = update.message.from_user.id
-    branch_name = update.message.text
-    user_data = USER_CHANNELS.get(user_id, {})
-    trainer_name = user_data.get("trainer_name", "Тренер")
-    branches = user_data.get("branches", [])
-    
-    for branch in branches:
-        if branch["name"] == branch_name:
-            context.user_data["branch"] = branch
-            context.user_data["trainer_name"] = trainer_name
-            buttons = [["Отправить начало тренировки"], ["Отправить конец тренировки"], ["Выбрать филиал"]]
-            reply_markup = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
-            await update.message.reply_text(f"{trainer_name}, вы выбрали {branch_name}. Выберите действие:", reply_markup=reply_markup)
-            return CHOOSE_ACTION
-    
-    await update.message.reply_text("Неверный выбор. Попробуйте снова.")
-    return CHOOSE_BRANCH
-
-# Отправка фото
-async def send_photo(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    if "branch" not in context.user_data:
-        await update.message.reply_text("Сначала выберите филиал.")
-        return CHOOSE_BRANCH
-    
-    if not update.message.photo:
-        await update.message.reply_text("Пожалуйста, отправьте фото.")
-        return SEND_PHOTO
-    
-    photo = update.message.photo[-1].file_id
-    action = context.user_data.get("action")
-    text = random.choice(TXT_START if action == "start" else TXT_END)
-    channel_id = context.user_data["branch"]["id"]
-    trainer_name = context.user_data["trainer_name"]
-    await context.bot.send_photo(chat_id=channel_id, photo=photo, caption=f"{trainer_name}: {text}")
-    await update.message.reply_text(f"Фото опубликовано в {context.user_data['branch']['name']}.")
-    
-    if action == "start":
-        buttons = [["Отправить конец тренировки"], ["Выбрать филиал"]]
-        reply_markup = ReplyKeyboardMarkup(buttons, resize_keyboard=True)
-        await update.message.reply_text("Выберите действие:", reply_markup=reply_markup)
-    return CHOOSE_ACTION
-
-# Выбор действия
-async def choose_action(update: Update, context: CallbackContext):
     text = update.message.text
-    if text == "Отправить начало тренировки":
-        context.user_data["action"] = "start"
-        await update.message.reply_text("Отправьте фото начала тренировки:", reply_markup=ReplyKeyboardRemove())
-        return SEND_PHOTO
-    elif text == "Отправить конец тренировки":
-        context.user_data["action"] = "end"
-        await update.message.reply_text("Отправьте фото конца тренировки:", reply_markup=ReplyKeyboardRemove())
-        return SEND_PHOTO
-    elif text == "Выбрать филиал":
-        return await start(update, context)
-    else:
-        await update.message.reply_text("Неверный выбор. Попробуйте снова.")
-        return CHOOSE_ACTION
 
-# Настройка обработчиков
-async def main():
-    application = Application.builder().token("YOUR_BOT_TOKEN").build()
+    if user_id not in user_data:
+        update.message.reply_text("Пожалуйста, начните с команды /start.")
+        return
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
-        states={
-            CHOOSE_BRANCH: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_branch)],
-            CHOOSE_ACTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_action)],
-            SEND_PHOTO: [MessageHandler(filters.PHOTO, send_photo)]
-        },
-        fallbacks=[]
-    )
-    application.add_handler(conv_handler)
-
-    # Запуск бота
-    await application.run_polling()
-
-# Запуск приложения
-if __name__ == "__main__":
-    try:
-        # Попытка запустить asyncio.run()
-        asyncio.run(main())
-    except RuntimeError as e:
-        if str(e) == "This event loop is already running":
-            # Если событийный цикл уже запущен, используем существующий
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(main())
+    if user_data[user_id]["step"] == "choose_branch":
+        branch_names = [branch["name"] for branch in users[user_id]["branches"]]
+        if text in branch_names:
+            user_data[user_id]["branch"] = next(branch for branch in users[user_id]["branches"] if branch["name"] == text)
+            user_data[user_id]["step"] = "choose_action"
+            update.message.reply_text("Выбери действие:", reply_markup=ReplyKeyboardMarkup([["Отправить начало тренировки", "Отправить конец тренировки", "Выбрать филиал"]], one_time_keyboard=True))
         else:
-            # Если ошибка не связана с событийным циклом, выбрасываем исключение
-            raise e
+            update.message.reply_text("Пожалуйста, выбери филиал из списка.")
+
+    elif user_data[user_id]["step"] == "choose_action":
+        if text == "Отправить начало тренировки":
+            user_data[user_id]["step"] = "send_start_photo"
+            update.message.reply_text("Отправь фотографию для начала тренировки.")
+        elif text == "Отправить конец тренировки":
+            user_data[user_id]["step"] = "send_end_photo"
+            update.message.reply_text("Отправь фотографию для конца тренировки.")
+        elif text == "Выбрать филиал":
+            user_data[user_id]["step"] = "choose_branch"
+            branch_names = [branch["name"] for branch in users[user_id]["branches"]]
+            update.message.reply_text("Выбери филиал:", reply_markup=ReplyKeyboardMarkup([branch_names], one_time_keyboard=True))
+        else:
+            update.message.reply_text("Пожалуйста, выбери действие из списка.")
+
+def handle_photo(update: Update, context: CallbackContext) -> None:
+    user_id = update.message.from_user.id
+    photo = update.message.photo[-1].file_id
+
+    if user_data[user_id]["step"] == "send_start_photo":
+        branch = user_data[user_id]["branch"]
+        channel_id = branch["id"]
+        caption = random.choice(TXT_START)  # Случайный выбор текста
+        context.bot.send_photo(chat_id=channel_id, photo=photo, caption=caption)
+        update.message.reply_text(f"Фотография успешно опубликована в канале {branch['name']}.")
+        user_data[user_id]["step"] = "choose_action"
+        update.message.reply_text("Выбери действие:", reply_markup=ReplyKeyboardMarkup([["Отправить конец тренировки", "Выбрать филиал"]], one_time_keyboard=True))
+
+    elif user_data[user_id]["step"] == "send_end_photo":
+        branch = user_data[user_id]["branch"]
+        channel_id = branch["id"]
+        caption = random.choice(TXT_END)  # Случайный выбор текста
+        context.bot.send_photo(chat_id=channel_id, photo=photo, caption=caption)
+        update.message.reply_text(f"Фотография успешно опубликована в канале {branch['name']}.")
+        user_data[user_id]["step"] = "choose_action"
+        update.message.reply_text("Выбери действие:", reply_markup=ReplyKeyboardMarkup([["Отправить начало тренировки", "Выбрать филиал"]], one_time_keyboard=True))
+
+def main() -> None:
+    # Вставьте сюда ваш токен
+    updater = Updater("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ")
+
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message))
+    dispatcher.add_handler(MessageHandler(Filters.photo, handle_photo))
+
+    updater.start_polling()
+    updater.idle()
+
+if __name__ == '__main__':
+    main()
