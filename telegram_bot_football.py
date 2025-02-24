@@ -1,11 +1,12 @@
 import logging
 import random
+import asyncio
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import (
-    Application,  # Используем Application вместо Updater
+    Application,
     CommandHandler,
     MessageHandler,
-    filters,  # Используем filters вместо Filters
+    filters,
     CallbackContext,
 )
 
@@ -142,16 +143,24 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
 
 async def main() -> None:
     # Вставьте сюда ваш токен
-    application = Application.builder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
+    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
 
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))  # Используем filters.TEXT
-    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))  # Используем filters.PHOTO
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     # Запускаем бота
     await application.run_polling()
 
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main())
+    try:
+        # Используем существующий цикл событий, если он уже запущен
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(main())
+    except RuntimeError as e:
+        # Если цикл событий не запущен, создаем новый
+        if "event loop is already running" in str(e):
+            asyncio.run(main())
+        else:
+            raise e
