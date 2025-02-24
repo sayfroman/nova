@@ -8,6 +8,7 @@ from telegram.ext import (
     ConversationHandler,
 )
 import random
+import asyncio
 
 # Константы для состояний
 CHOOSE_BRANCH, CHOOSE_ACTION, SEND_PHOTO = range(3)
@@ -157,6 +158,16 @@ async def main():
     # Запуск бота
     await application.run_polling()
 
+# Запуск приложения
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    try:
+        # Попытка запустить asyncio.run()
+        asyncio.run(main())
+    except RuntimeError as e:
+        if str(e) == "This event loop is already running":
+            # Если событийный цикл уже запущен, используем существующий
+            loop = asyncio.get_event_loop()
+            loop.run_until_complete(main())
+        else:
+            # Если ошибка не связана с событийным циклом, выбрасываем исключение
+            raise e
