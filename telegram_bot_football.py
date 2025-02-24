@@ -143,7 +143,7 @@ async def handle_photo(update: Update, context: CallbackContext) -> None:
 
 async def main() -> None:
     # Вставьте сюда ваш токен
-    application = Application.builder().token("YOUR_TELEGRAM_BOT_TOKEN").build()
+    application = Application.builder().token("7801498081:AAFCSe2aO5A2ZdnSqIblaf-45aRQQuybpqQ").build()
 
     # Регистрируем обработчики
     application.add_handler(CommandHandler("start", start))
